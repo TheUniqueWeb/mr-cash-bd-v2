@@ -1,0 +1,18 @@
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { getFirestore } from 'firebase/firestore';
+
+const firebaseConfig = {
+  projectId: "alpine-sanctuary-cv7sv",
+  appId: "1:217284418929:web:28fcf46b3c1d712fca2ad0",
+  apiKey: "AIzaSyCTGB4qXSf0lfRfqj7yqE-pZIbb7pKYR7o",
+  authDomain: "alpine-sanctuary-cv7sv.firebaseapp.com",
+  firestoreDatabaseId: "ai-studio-328a5165-abfc-4171-9abb-2d821959bfd3",
+  storageBucket: "alpine-sanctuary-cv7sv.firebasestorage.app",
+  messagingSenderId: "217284418929",
+};
+
+// Initialize Firebase
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+
+export { app, db };

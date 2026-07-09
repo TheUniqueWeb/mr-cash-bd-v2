@@ -1,0 +1,83 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User profile with balance points and referral metrics",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "username": { "type": "string" },
+        "balancePoints": { "type": "number" },
+        "totalReferred": { "type": "number" },
+        "referredBy": { "type": "string" },
+        "pendingCashoutPoints": { "type": "number" },
+        "todayWorkPoints": { "type": "number" },
+        "ipAddress": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "isAdmin": { "type": "boolean" }
+      },
+      "required": ["uid", "email", "username", "balancePoints"]
+    },
+    "Credential": {
+      "title": "User Credentials",
+      "description": "User password details stored securely for backend-only access",
+      "type": "object",
+      "properties": {
+        "password": { "type": "string" }
+      },
+      "required": ["password"]
+    },
+    "Withdrawal": {
+      "title": "Withdrawal Request",
+      "description": "Cash out request placed by user",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "paymentMethod": { "type": "string" },
+        "paymentNumber": { "type": "string" },
+        "points": { "type": "number" },
+        "amountTk": { "type": "number" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["id", "userId", "paymentMethod", "paymentNumber", "points", "amountTk", "status"]
+    },
+    "PostbackLog": {
+      "title": "Postback Log",
+      "description": "CPA offer completion logs recorded from external callbacks",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "clickId": { "type": "string" },
+        "offerId": { "type": "string" },
+        "points": { "type": "number" },
+        "payout": { "type": "number" },
+        "userId": { "type": "string" },
+        "ip": { "type": "string" },
+        "timestamp": { "type": "number" }
+      },
+      "required": ["id", "userId", "points"]
+    }
+  },
+  "firestore": {
+    "/users/{username}": {
+      "schema": "User",
+      "description": "User profile collection"
+    },
+    "/credentials/{username}": {
+      "schema": "Credential",
+      "description": "Security credentials collection"
+    },
+    "/withdrawals/{withdrawalId}": {
+      "schema": "Withdrawal",
+      "description": "User withdrawal requests history"
+    },
+    "/postback_logs/{logId}": {
+      "schema": "PostbackLog",
+      "description": "Postback lead records"
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "MR CASH BD",
+  "description": "MR CASH BD - Professional GPT/CPA Reward Website. Earn points with high-paying masked premium tasks and cash out via bKash, Nagad, Rocket, Upay, or Mobile Recharge in Bangladesh.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
