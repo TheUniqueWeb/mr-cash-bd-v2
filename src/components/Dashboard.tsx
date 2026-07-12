@@ -22,6 +22,7 @@ interface DashboardProps {
   user: User;
   onNavigate: (tab: string) => void;
   onRefreshProfile: () => void;
+  isRefreshing?: boolean;
 }
 
 export const LEVELS = [
@@ -32,7 +33,7 @@ export const LEVELS = [
   { name: 'Diamond', minPoints: 500000, color: 'from-cyan-400 to-blue-600', textColor: 'text-cyan-600 bg-cyan-50 border-cyan-300', icon: '👑' },
 ];
 
-export default function Dashboard({ user, onNavigate, onRefreshProfile }: DashboardProps) {
+export default function Dashboard({ user, onNavigate, onRefreshProfile, isRefreshing = false }: DashboardProps) {
   const [supportMessage, setSupportMessage] = useState('');
   const [supportStatus, setSupportStatus] = useState('');
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
@@ -159,15 +160,23 @@ export default function Dashboard({ user, onNavigate, onRefreshProfile }: Dashbo
           <div className="grid grid-cols-2 gap-4 mb-6">
             <div className="space-y-1">
               <p className="text-xs font-semibold text-blue-200 uppercase tracking-wider">Points Balance</p>
-              <h2 className="text-3xl md:text-4xl font-black font-display text-white tracking-tight">
-                {user.balancePoints.toLocaleString()} <span className="text-sm font-semibold">PTS</span>
-              </h2>
+              {isRefreshing ? (
+                <div className="h-9 w-32 bg-white/20 rounded-xl animate-pulse mt-1" />
+              ) : (
+                <h2 className="text-3xl md:text-4xl font-black font-display text-white tracking-tight">
+                  {user.balancePoints.toLocaleString()} <span className="text-sm font-semibold">PTS</span>
+                </h2>
+              )}
             </div>
             <div className="space-y-1 border-l border-white/10 pl-6">
               <p className="text-xs font-semibold text-blue-200 uppercase tracking-wider">BDT Equivalent</p>
-              <h2 className="text-3xl md:text-4xl font-black font-display text-emerald-300 tracking-tight">
-                {bdtBalance} <span className="text-sm font-semibold text-white">৳</span>
-              </h2>
+              {isRefreshing ? (
+                <div className="h-9 w-24 bg-white/20 rounded-xl animate-pulse mt-1" />
+              ) : (
+                <h2 className="text-3xl md:text-4xl font-black font-display text-emerald-300 tracking-tight">
+                  {bdtBalance} <span className="text-sm font-semibold text-white">৳</span>
+                </h2>
+              )}
             </div>
           </div>
 
@@ -202,13 +211,17 @@ export default function Dashboard({ user, onNavigate, onRefreshProfile }: Dashbo
             <h3 className="text-lg font-bold font-display text-slate-800">Earning Targets</h3>
             <div className="space-y-3">
               <div>
-                <div className="flex justify-between text-xs text-slate-500 font-semibold mb-1">
+                <div className="flex justify-between items-center text-xs text-slate-500 font-semibold mb-1">
                   <span>Today's Progress</span>
-                  <span>{user.todayWorkPoints} / 5,000 PTS</span>
+                  {isRefreshing ? (
+                    <div className="h-4 w-28 bg-slate-100 rounded-md animate-pulse" />
+                  ) : (
+                    <span>{user.todayWorkPoints} / 5,000 PTS</span>
+                  )}
                 </div>
                 <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
                   <div 
-                    className="h-full bg-blue-500 rounded-full transition-all duration-500" 
+                    className={`h-full bg-blue-500 rounded-full transition-all duration-500 ${isRefreshing ? 'animate-pulse' : ''}`} 
                     style={{ width: `${Math.min((user.todayWorkPoints / 5000) * 100, 100)}%` }}
                   ></div>
                 </div>
@@ -240,8 +253,17 @@ export default function Dashboard({ user, onNavigate, onRefreshProfile }: Dashbo
         <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between group hover:border-blue-100 transition">
           <div className="space-y-1">
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Today's Work</p>
-            <h3 className="text-2xl font-black font-display text-slate-800">{user.todayWorkPoints.toLocaleString()} PTS</h3>
-            <p className="text-xs font-bold text-emerald-500 font-display">+{todayBdt} TK today</p>
+            {isRefreshing ? (
+              <div className="space-y-1.5 py-1">
+                <div className="h-6 w-28 bg-slate-100 rounded-md animate-pulse" />
+                <div className="h-3.5 w-16 bg-slate-100 rounded-md animate-pulse" />
+              </div>
+            ) : (
+              <>
+                <h3 className="text-2xl font-black font-display text-slate-800">{user.todayWorkPoints.toLocaleString()} PTS</h3>
+                <p className="text-xs font-bold text-emerald-500 font-display">+{todayBdt} TK today</p>
+              </>
+            )}
           </div>
           <span className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
             <TrendingUp className="w-6 h-6" />
@@ -251,8 +273,17 @@ export default function Dashboard({ user, onNavigate, onRefreshProfile }: Dashbo
         <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between group hover:border-emerald-100 transition">
           <div className="space-y-1">
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Referrals</p>
-            <h3 className="text-2xl font-black font-display text-slate-800">{user.totalReferred} Users</h3>
-            <p className="text-xs font-bold text-blue-500 font-display">Earn 10% commission</p>
+            {isRefreshing ? (
+              <div className="space-y-1.5 py-1">
+                <div className="h-6 w-20 bg-slate-100 rounded-md animate-pulse" />
+                <div className="h-3.5 w-28 bg-slate-100 rounded-md animate-pulse" />
+              </div>
+            ) : (
+              <>
+                <h3 className="text-2xl font-black font-display text-slate-800">{user.totalReferred} Users</h3>
+                <p className="text-xs font-bold text-blue-500 font-display">Earn 10% commission</p>
+              </>
+            )}
           </div>
           <span className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
             <Users className="w-6 h-6" />
@@ -262,8 +293,17 @@ export default function Dashboard({ user, onNavigate, onRefreshProfile }: Dashbo
         <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between group hover:border-orange-100 transition">
           <div className="space-y-1">
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Pending Cashout</p>
-            <h3 className="text-2xl font-black font-display text-slate-800">{user.pendingCashoutPoints.toLocaleString()} PTS</h3>
-            <p className="text-xs font-bold text-orange-500 font-display">{pendingBdt} TK in progress</p>
+            {isRefreshing ? (
+              <div className="space-y-1.5 py-1">
+                <div className="h-6 w-24 bg-slate-100 rounded-md animate-pulse" />
+                <div className="h-3.5 w-28 bg-slate-100 rounded-md animate-pulse" />
+              </div>
+            ) : (
+              <>
+                <h3 className="text-2xl font-black font-display text-slate-800">{user.pendingCashoutPoints.toLocaleString()} PTS</h3>
+                <p className="text-xs font-bold text-orange-500 font-display">{pendingBdt} TK in progress</p>
+              </>
+            )}
           </div>
           <span className="w-12 h-12 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center">
             <Clock className="w-6 h-6" />
@@ -273,7 +313,7 @@ export default function Dashboard({ user, onNavigate, onRefreshProfile }: Dashbo
 
       {/* LEDGERS SECTION */}
       <div className="grid grid-cols-1" id="dashboard-enhanced-ledgers">
-        <TransactionHistory username={user.username} />
+        <TransactionHistory username={user.username} isRefreshing={isRefreshing} />
       </div>
 
       {/* LEADERBOARD, REFERRAL SYSTEM & SUPPORT FORM */}

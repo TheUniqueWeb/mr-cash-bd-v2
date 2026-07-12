@@ -31,11 +31,17 @@ export default function Withdraw({ user, onRefreshProfile }: WithdrawProps) {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
   const fetchWithdrawHistory = async () => {
+    if (!user || !user.username || typeof user.username !== 'string' || user.username.trim() === '') return;
     try {
-      const res = await fetch(`/api/v1/withdrawals/${user.username}`);
+      const res = await fetch(`/api/v1/withdrawals/${encodeURIComponent(user.username.trim())}`);
       if (res.ok) {
-        const data = await res.json();
-        setWithdrawals(data);
+        const contentType = res.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const data = await res.json();
+          setWithdrawals(Array.isArray(data) ? data : []);
+        } else {
+          console.warn("Expected JSON response from withdrawals API, but got:", contentType);
+        }
       }
     } catch (err) {
       console.error('History fetch error:', err);

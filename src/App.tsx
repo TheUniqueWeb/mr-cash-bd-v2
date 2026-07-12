@@ -9,6 +9,7 @@ import AdminPanel from './components/AdminPanel';
 import AuthModal from './components/AuthModal';
 import Settings from './components/Settings';
 import AdBanner from './components/AdBanner';
+import RedeemCode from './components/RedeemCode';
 import { User, SystemSettings } from './types';
 import { Sparkles, Heart, AlertCircle, ShieldCheck, Headset } from 'lucide-react';
 
@@ -17,6 +18,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<string>('home');
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
+  const [isProfileSyncing, setIsProfileSyncing] = useState(false);
 
   // 1. Initial State Load
   useEffect(() => {
@@ -54,6 +56,7 @@ export default function App() {
   // 2. Synchronize user profile balance
   const handleRefreshProfile = async () => {
     if (!user) return;
+    setIsProfileSyncing(true);
     try {
       const res = await fetch(`/api/v1/user/profile/${encodeURIComponent(user.username)}`);
       if (res.ok) {
@@ -63,6 +66,8 @@ export default function App() {
       }
     } catch (err) {
       console.warn('Failed to sync user stats:', err);
+    } finally {
+      setIsProfileSyncing(false);
     }
   };
 
@@ -97,10 +102,19 @@ export default function App() {
             user={user} 
             onNavigate={(tab) => setActiveTab(tab)} 
             onRefreshProfile={handleRefreshProfile}
+            isRefreshing={isProfileSyncing}
           />
         ) : null;
       case 'work':
         return <Offerwall user={user} onOpenAuth={() => setIsAuthOpen(true)} />;
+      case 'redeem':
+        return user ? (
+          <RedeemCode 
+            user={user} 
+            onRefreshProfile={handleRefreshProfile}
+            onNavigate={(tab) => setActiveTab(tab)}
+          />
+        ) : null;
       case 'referral':
         return user ? <ReferralPage user={user} /> : null;
       case 'withdraw':

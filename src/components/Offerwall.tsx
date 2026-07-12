@@ -142,86 +142,103 @@ export default function Offerwall({ user, onOpenAuth }: OfferwallProps) {
             Retry Connection
           </button>
         </div>
-      ) : loading ? (
-        /* Offer Skeletal Loading */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="offerwall-loading-grid">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="bg-white p-6 rounded-2xl border border-slate-100 space-y-4 animate-pulse">
-              <div className="flex justify-between items-center">
-                <div className="w-10 h-10 bg-slate-100 rounded-xl"></div>
-                <div className="w-20 h-6 bg-slate-100 rounded-lg"></div>
-              </div>
-              <div className="space-y-2">
-                <div className="w-3/4 h-5 bg-slate-100 rounded-md"></div>
-                <div className="w-full h-10 bg-slate-100 rounded-md"></div>
-              </div>
-              <div className="w-full h-11 bg-slate-100 rounded-xl"></div>
-            </div>
-          ))}
-        </div>
       ) : (
         <>
-          {/* IP Safety Indicator */}
-          <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-emerald-800 text-xs">
-            <div className="flex items-center gap-2">
-              <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>
-                Verified connection from <strong>{ipInfo.country || 'Bangladesh'}</strong>. IP: <code>{ipInfo.ip}</code> (Safe, No VPN detected).
-              </span>
+          {/* IP Safety Indicator / Skeleton */}
+          {loading ? (
+            <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs animate-pulse">
+              <div className="flex items-center gap-2 flex-grow">
+                <div className="w-4 h-4 bg-slate-200 rounded-full shrink-0" />
+                <div className="h-4 bg-slate-200 rounded w-1/2" />
+              </div>
+              <div className="w-24 h-5 bg-slate-200 rounded-md" />
             </div>
-            <span className="bg-emerald-200/50 font-bold px-2 py-0.5 rounded uppercase">SECURE PORTAL</span>
-          </div>
+          ) : (
+            <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-emerald-800 text-xs">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>
+                  Verified connection from <strong>{ipInfo.country || 'Bangladesh'}</strong>. IP: <code>{ipInfo.ip}</code> (Safe, No VPN detected).
+                </span>
+              </div>
+              <span className="bg-emerald-200/50 font-bold px-2 py-0.5 rounded uppercase">SECURE PORTAL</span>
+            </div>
+          )}
 
-          {/* Category Tabs */}
-          <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 pb-2" id="category-tabs-container">
-            <button
-              onClick={() => setSelectedCategory('All')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold font-display flex items-center gap-1.5 transition cursor-pointer border ${
-                selectedCategory === 'All' 
-                  ? 'bg-blue-600 text-white border-blue-600 shadow-sm' 
-                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-slate-800'
-              }`}
-            >
-              <Layers className="w-3.5 h-3.5" />
-              All Tasks
-            </button>
-            <button
-              onClick={() => setSelectedCategory('Surveys')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold font-display flex items-center gap-1.5 transition cursor-pointer border ${
-                selectedCategory === 'Surveys' 
-                  ? 'bg-blue-600 text-white border-blue-600 shadow-sm' 
-                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-slate-800'
-              }`}
-            >
-              <ClipboardList className="w-3.5 h-3.5" />
-              Surveys
-            </button>
-            <button
-              onClick={() => setSelectedCategory('App Installs')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold font-display flex items-center gap-1.5 transition cursor-pointer border ${
-                selectedCategory === 'App Installs' 
-                  ? 'bg-blue-600 text-white border-blue-600 shadow-sm' 
-                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-slate-800'
-              }`}
-            >
-              <Download className="w-3.5 h-3.5" />
-              App Installs
-            </button>
-            <button
-              onClick={() => setSelectedCategory('Signups')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold font-display flex items-center gap-1.5 transition cursor-pointer border ${
-                selectedCategory === 'Signups' 
-                  ? 'bg-blue-600 text-white border-blue-600 shadow-sm' 
-                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-slate-800'
-              }`}
-            >
-              <UserCheck className="w-3.5 h-3.5" />
-              Signups
-            </button>
-          </div>
+          {/* Category Tabs / Skeleton */}
+          {loading ? (
+            <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 pb-2">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="h-8 w-24 bg-slate-100/80 rounded-xl animate-pulse" />
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 pb-2" id="category-tabs-container">
+              <button
+                onClick={() => setSelectedCategory('All')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold font-display flex items-center gap-1.5 transition cursor-pointer border ${
+                  selectedCategory === 'All' 
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm' 
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-slate-800'
+                }`}
+              >
+                <Layers className="w-3.5 h-3.5" />
+                All Tasks
+              </button>
+              <button
+                onClick={() => setSelectedCategory('Surveys')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold font-display flex items-center gap-1.5 transition cursor-pointer border ${
+                  selectedCategory === 'Surveys' 
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm' 
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-slate-800'
+                }`}
+              >
+                <ClipboardList className="w-3.5 h-3.5" />
+                Surveys
+              </button>
+              <button
+                onClick={() => setSelectedCategory('App Installs')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold font-display flex items-center gap-1.5 transition cursor-pointer border ${
+                  selectedCategory === 'App Installs' 
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm' 
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-slate-800'
+                }`}
+              >
+                <Download className="w-3.5 h-3.5" />
+                App Installs
+              </button>
+              <button
+                onClick={() => setSelectedCategory('Signups')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold font-display flex items-center gap-1.5 transition cursor-pointer border ${
+                  selectedCategory === 'Signups' 
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm' 
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-slate-800'
+                }`}
+              >
+                <UserCheck className="w-3.5 h-3.5" />
+                Signups
+              </button>
+            </div>
+          )}
 
-          {/* Offers Grid */}
-          {filteredOffers.length === 0 ? (
+          {/* Offers Grid / Skeleton */}
+          {loading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="offerwall-loading-grid">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} className="bg-white p-6 rounded-2xl border border-slate-100 space-y-4 animate-pulse">
+                  <div className="flex justify-between items-center">
+                    <div className="w-10 h-10 bg-slate-100 rounded-xl"></div>
+                    <div className="w-20 h-6 bg-slate-100 rounded-lg"></div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="w-3/4 h-5 bg-slate-100 rounded-md"></div>
+                    <div className="w-full h-10 bg-slate-100 rounded-md"></div>
+                  </div>
+                  <div className="w-full h-11 bg-slate-100 rounded-xl"></div>
+                </div>
+              ))}
+            </div>
+          ) : filteredOffers.length === 0 ? (
             <div className="text-center py-12 space-y-3 bg-white rounded-3xl border border-slate-100 p-8" id="offers-empty">
               <AlertCircle className="w-12 h-12 text-slate-300 mx-auto" />
               <h3 className="text-lg font-bold font-display text-slate-800">No active {selectedCategory.toLowerCase()} available</h3>

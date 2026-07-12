@@ -1,114 +1,195 @@
 import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
-import { initializeApp } from 'firebase/app';
-import { 
-  getFirestore, 
-  collection, 
-  doc, 
-  getDoc, 
-  getDocs, 
-  setDoc, 
-  updateDoc, 
-  deleteDoc, 
-  query, 
-  where, 
-  orderBy, 
-  limit, 
-  writeBatch,
-  increment,
-  serverTimestamp
-} from 'firebase/firestore';
+import { db as drizzleDb } from './src/db/index.ts';
+import { users, credentials, notifications, postbackLogs, withdrawals, systemSettings, redeemCodes, userRedemptions } from './src/db/schema.ts';
+import { eq, and, desc, asc, sql } from 'drizzle-orm';
 
-const firebaseConfig = {
-  projectId: "alpine-sanctuary-cv7sv",
-  appId: "1:217284418929:web:28fcf46b3c1d712fca2ad0",
-  apiKey: "AIzaSyCTGB4qXSf0lfRfqj7yqE-pZIbb7pKYR7o",
-  authDomain: "alpine-sanctuary-cv7sv.firebaseapp.com",
-  firestoreDatabaseId: "ai-studio-328a5165-abfc-4171-9abb-2d821959bfd3",
-  storageBucket: "alpine-sanctuary-cv7sv.firebasestorage.app",
-  messagingSenderId: "217284418929",
+const tableMap: Record<string, { table: any; keyCol: string; keyProp: string }> = {
+  users: { table: users, keyCol: 'username', keyProp: 'username' },
+  credentials: { table: credentials, keyCol: 'username', keyProp: 'username' },
+  notifications: { table: notifications, keyCol: 'id', keyProp: 'id' },
+  postback_logs: { table: postbackLogs, keyCol: 'id', keyProp: 'id' },
+  withdrawals: { table: withdrawals, keyCol: 'id', keyProp: 'id' },
+  system_settings: { table: systemSettings, keyCol: 'id', keyProp: 'id' },
+  redeem_codes: { table: redeemCodes, keyCol: 'code', keyProp: 'code' },
+  user_redemptions: { table: userRedemptions, keyCol: 'id', keyProp: 'id' },
 };
 
-const firebaseApp = initializeApp(firebaseConfig);
-const rawDb = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId);
+const sanitizeDataForSql = (table: any, data: any) => {
+  const sanitized: any = {};
+  const increments: any = {};
+
+  for (const [key, val] of Object.entries(data)) {
+    if (val === undefined || !(key in table)) continue;
+
+    if (val && typeof val === 'object' && '__increment' in val) {
+      increments[key] = (val as any).__increment;
+    } else {
+      sanitized[key] = val;
+    }
+  }
+  return { sanitized, increments };
+};
 
 // Compat classes to mimic the firebase-admin / v8 syntax
 class CompatDocRef {
   constructor(public _collectionPath: string, public _docId: string) {}
 
-  get ref() {
-    return doc(rawDb, this._collectionPath, this._docId);
-  }
-
   async set(data: any, options?: any) {
-    if (options && options.merge) {
-      await setDoc(this.ref, data, { merge: true });
-    } else {
-      await setDoc(this.ref, data);
+    const tableInfo = tableMap[this._collectionPath];
+    if (!tableInfo) throw new Error(`Unknown collection path: ${this._collectionPath}`);
+
+    const { sanitized, increments } = sanitizeDataForSql(tableInfo.table, data);
+    const insertValues = { ...sanitized };
+    for (const [key, incVal] of Object.entries(increments)) {
+      insertValues[key] = incVal;
     }
+
+    if (insertValues[tableInfo.keyProp] === undefined) {
+      insertValues[tableInfo.keyProp] = this._docId;
+    }
+
+    const updateFields: any = { ...sanitized };
+    for (const [key, incVal] of Object.entries(increments)) {
+      updateFields[key] = sql`${tableInfo.table[key]} + ${incVal}`;
+    }
+
+    await drizzleDb.insert(tableInfo.table)
+      .values(insertValues)
+      .onConflictDoUpdate({
+        target: tableInfo.table[tableInfo.keyCol],
+        set: updateFields,
+      });
   }
 
   async update(data: any) {
-    await updateDoc(this.ref, data);
+    const tableInfo = tableMap[this._collectionPath];
+    if (!tableInfo) throw new Error(`Unknown collection path: ${this._collectionPath}`);
+
+    const { sanitized, increments } = sanitizeDataForSql(tableInfo.table, data);
+    const updateFields: any = { ...sanitized };
+    for (const [key, incVal] of Object.entries(increments)) {
+      updateFields[key] = sql`${tableInfo.table[key]} + ${incVal}`;
+    }
+
+    if (Object.keys(updateFields).length === 0) return;
+
+    await drizzleDb.update(tableInfo.table)
+      .set(updateFields)
+      .where(eq(tableInfo.table[tableInfo.keyCol], this._docId));
   }
 
   async get() {
-    const snap = await getDoc(this.ref);
+    const tableInfo = tableMap[this._collectionPath];
+    if (!tableInfo) throw new Error(`Unknown collection path: ${this._collectionPath}`);
+
+    const rows = await drizzleDb.select()
+      .from(tableInfo.table)
+      .where(eq(tableInfo.table[tableInfo.keyCol], this._docId))
+      .limit(1);
+
+    const exists = rows.length > 0;
+    const rowData = exists ? rows[0] : undefined;
+
     return {
-      exists: snap.exists(),
-      id: snap.id,
-      data: () => snap.data()
+      exists,
+      id: this._docId,
+      data: () => rowData,
     };
   }
 
   async delete() {
-    await deleteDoc(this.ref);
+    const tableInfo = tableMap[this._collectionPath];
+    if (!tableInfo) throw new Error(`Unknown collection path: ${this._collectionPath}`);
+
+    await drizzleDb.delete(tableInfo.table)
+      .where(eq(tableInfo.table[tableInfo.keyCol], this._docId));
   }
 }
 
 class CompatQuery {
+  protected _whereConditions: { field: string; value: any }[] = [];
+  protected _orderByFields: { field: string; direction: 'asc' | 'desc' }[] = [];
+  protected _limitVal?: number;
+
   constructor(
     public _collectionPath: string,
-    public _constraints: any[] = []
-  ) {}
+    whereConditions: { field: string; value: any }[] = [],
+    orderByFields: { field: string; direction: 'asc' | 'desc' }[] = [],
+    limitVal?: number
+  ) {
+    this._whereConditions = [...whereConditions];
+    this._orderByFields = [...orderByFields];
+    this._limitVal = limitVal;
+  }
 
   where(field: string, op: string, value: any) {
-    return new CompatQuery(this._collectionPath, [
-      ...this._constraints,
-      where(field, op as any, value)
-    ]);
+    return new CompatQuery(
+      this._collectionPath,
+      [...this._whereConditions, { field, value }],
+      this._orderByFields,
+      this._limitVal
+    );
   }
 
   orderBy(field: string, direction: 'asc' | 'desc' = 'asc') {
-    return new CompatQuery(this._collectionPath, [
-      ...this._constraints,
-      orderBy(field, direction)
-    ]);
+    return new CompatQuery(
+      this._collectionPath,
+      this._whereConditions,
+      [...this._orderByFields, { field, direction }],
+      this._limitVal
+    );
   }
 
   limit(num: number) {
-    return new CompatQuery(this._collectionPath, [
-      ...this._constraints,
-      limit(num)
-    ]);
+    return new CompatQuery(
+      this._collectionPath,
+      this._whereConditions,
+      this._orderByFields,
+      num
+    );
   }
 
   async get() {
-    const colRef = collection(rawDb, this._collectionPath);
-    const q = query(colRef, ...this._constraints);
-    const snap = await getDocs(q);
-    
-    const docs = snap.docs.map(d => ({
-      id: d.id,
-      exists: true,
-      data: () => d.data(),
-      ref: new CompatDocRef(this._collectionPath, d.id)
-    }));
+    const tableInfo = tableMap[this._collectionPath];
+    if (!tableInfo) throw new Error(`Unknown collection path: ${this._collectionPath}`);
+
+    let queryBuilder = drizzleDb.select().from(tableInfo.table);
+    const conditions = this._whereConditions.map(cond => {
+      return eq(tableInfo.table[cond.field], cond.value);
+    });
+
+    if (conditions.length > 0) {
+      queryBuilder = queryBuilder.where(and(...conditions)) as any;
+    }
+
+    const orderSpec = this._orderByFields.map(ord => {
+      return ord.direction === 'desc' ? desc(tableInfo.table[ord.field]) : asc(tableInfo.table[ord.field]);
+    });
+
+    if (orderSpec.length > 0) {
+      queryBuilder = queryBuilder.orderBy(...orderSpec) as any;
+    }
+
+    if (this._limitVal !== undefined) {
+      queryBuilder = queryBuilder.limit(this._limitVal) as any;
+    }
+
+    const rows = await queryBuilder;
+    const docs = rows.map((row: any) => {
+      const docId = row[tableInfo.keyProp];
+      return {
+        id: docId,
+        exists: true,
+        data: () => row,
+        ref: new CompatDocRef(this._collectionPath, docId),
+      };
+    });
 
     return {
-      size: snap.size,
-      empty: snap.empty,
+      size: docs.length,
+      empty: docs.length === 0,
       docs,
       forEach: (callback: (doc: any) => void) => {
         docs.forEach(callback);
@@ -119,39 +200,54 @@ class CompatQuery {
 
 class CompatCollectionRef extends CompatQuery {
   constructor(collectionPath: string) {
-    super(collectionPath, []);
+    super(collectionPath, [], [], undefined);
   }
 
   doc(id?: string) {
-    const finalId = id || doc(collection(rawDb, this._collectionPath)).id;
+    const finalId = id || this._generateDocId();
     return new CompatDocRef(this._collectionPath, finalId);
+  }
+
+  private _generateDocId(): string {
+    if (this._collectionPath === 'notifications') {
+      return `NT-${Math.floor(100000 + Math.random() * 900000)}`;
+    } else if (this._collectionPath === 'postback_logs') {
+      return `LB-${Date.now()}-${Math.floor(100000 + Math.random() * 900000)}`;
+    } else if (this._collectionPath === 'withdrawals') {
+      return `WD-${Math.floor(100000 + Math.random() * 900000)}`;
+    }
+    return Math.random().toString(36).substring(2, 15);
   }
 }
 
 class CompatBatch {
-  private _batch = writeBatch(rawDb);
+  private _ops: (() => Promise<void>)[] = [];
 
   set(docRef: CompatDocRef, data: any, options?: any) {
-    if (options && options.merge) {
-      this._batch.set(docRef.ref, data, { merge: true });
-    } else {
-      this._batch.set(docRef.ref, data);
-    }
+    this._ops.push(async () => {
+      await docRef.set(data, options);
+    });
     return this;
   }
 
   update(docRef: CompatDocRef, data: any) {
-    this._batch.update(docRef.ref, data);
+    this._ops.push(async () => {
+      await docRef.update(data);
+    });
     return this;
   }
 
   delete(docRef: CompatDocRef) {
-    this._batch.delete(docRef.ref);
+    this._ops.push(async () => {
+      await docRef.delete();
+    });
     return this;
   }
 
   async commit() {
-    await this._batch.commit();
+    for (const op of this._ops) {
+      await op();
+    }
   }
 }
 
@@ -161,8 +257,8 @@ const db = {
 };
 
 const FieldValue = {
-  increment: (val: number) => increment(val),
-  serverTimestamp: () => serverTimestamp()
+  increment: (val: number) => ({ __increment: val }),
+  serverTimestamp: () => Date.now()
 };
 
 const PORT = 3000;
@@ -181,6 +277,28 @@ async function startServer() {
     adsenseCode: '',
     supportLink: 'https://t.me/mrcashbd'
   };
+
+  try {
+    const rows = await drizzleDb.select().from(systemSettings).where(eq(systemSettings.id, 'global')).limit(1);
+    if (rows.length > 0) {
+      sysSettings = {
+        vpnCheckEnabled: rows[0].vpnCheckEnabled,
+        conversionRate: rows[0].conversionRate,
+        pointsToBdtRate: rows[0].pointsToBdtRate,
+        minWithdrawRechargePoints: rows[0].minWithdrawRechargePoints,
+        minWithdrawBankPoints: rows[0].minWithdrawBankPoints,
+        adsenseCode: rows[0].adsenseCode,
+        supportLink: rows[0].supportLink,
+      };
+    } else {
+      await drizzleDb.insert(systemSettings).values({
+        id: 'global',
+        ...sysSettings,
+      });
+    }
+  } catch (err) {
+    console.error('Failed to load system settings from database:', err);
+  }
 
   // Helper: Create persistent notifications in Firestore
   async function addNotification(userId: string, title: string, message: string, type: 'withdrawal' | 'task' | 'referral') {
@@ -1240,7 +1358,7 @@ async function startServer() {
     res.json(sysSettings);
   });
 
-  app.post('/api/v1/admin/settings/update', (req, res) => {
+  app.post('/api/v1/admin/settings/update', async (req, res) => {
     try {
       const { 
         vpnCheckEnabled, 
@@ -1260,8 +1378,20 @@ async function startServer() {
       if (adsenseCode !== undefined) sysSettings.adsenseCode = String(adsenseCode);
       if (supportLink !== undefined) sysSettings.supportLink = String(supportLink);
 
+      // Persist to PostgreSQL
+      await drizzleDb.insert(systemSettings)
+        .values({
+          id: 'global',
+          ...sysSettings
+        })
+        .onConflictDoUpdate({
+          target: systemSettings.id,
+          set: sysSettings
+        });
+
       res.json({ success: true, message: 'System configurations updated.', settings: sysSettings });
     } catch (err) {
+      console.error('Failed to save configuration settings to PostgreSQL:', err);
       res.status(500).json({ error: 'Failed to save configuration settings.' });
     }
   });
@@ -1315,6 +1445,183 @@ async function startServer() {
     } catch (err) {
       console.error('Mark read notifications error:', err);
       res.status(500).json({ error: 'Failed to mark notification as read.' });
+    }
+  });
+
+  // 15. REDEEM CODES SYSTEM: Get active events for user
+  app.get('/api/v1/redeem/events', async (req, res) => {
+    try {
+      const now = Date.now();
+      const snaps = await db.collection('redeem_codes').get();
+      const list: any[] = [];
+      snaps.forEach((doc) => {
+        const data = doc.data();
+        if (data && data.expiresAt > now) {
+          list.push(data);
+        }
+      });
+      // Sort by newest first
+      list.sort((a, b) => b.createdAt - a.createdAt);
+      res.json(list);
+    } catch (err) {
+      console.error('Fetch redeem events error:', err);
+      res.status(500).json({ error: 'Failed to retrieve ongoing events.' });
+    }
+  });
+
+  // 16. REDEEM CODES SYSTEM: Redeem code for user
+  app.post('/api/v1/redeem', async (req, res) => {
+    try {
+      const { username, code } = req.body;
+      if (!username || !code) {
+        return res.status(400).json({ error: 'Missing username or code parameter' });
+      }
+
+      const userNormalized = username.toLowerCase().trim();
+      const codeNormalized = code.toUpperCase().trim();
+
+      // 1. Verify User exists
+      const userRef = db.collection('users').doc(userNormalized);
+      const userSnap = await userRef.get();
+      if (!userSnap.exists) {
+        return res.status(404).json({ error: 'User account not found.' });
+      }
+
+      const userData = userSnap.data();
+      if (userData.status === 'banned') {
+        return res.status(403).json({ error: 'Banned accounts cannot claim rewards.' });
+      }
+
+      // 2. Verify code exists in DB
+      const codeRef = db.collection('redeem_codes').doc(codeNormalized);
+      const codeSnap = await codeRef.get();
+      if (!codeSnap.exists) {
+        return res.status(400).json({ error: 'Invalid or incorrect redemption code.' });
+      }
+
+      const codeData = codeSnap.data();
+
+      // 3. Verify Code hasn't expired
+      if (codeData.expiresAt < Date.now()) {
+        return res.status(400).json({ error: 'This promo code has already expired.' });
+      }
+
+      // 4. Verify limit for limited codes
+      if (codeData.eligibilityType === 'limited' && codeData.redeemedCount >= codeData.maxUsers) {
+        return res.status(400).json({ error: 'This code has reached its maximum limit of claims.' });
+      }
+
+      // 5. Verify user hasn't already claimed it
+      const claimId = `${userNormalized}_${codeNormalized}`;
+      const claimRef = db.collection('user_redemptions').doc(claimId);
+      const claimSnap = await claimRef.get();
+      if (claimSnap.exists) {
+        return res.status(400).json({ error: 'You have already redeemed this code!' });
+      }
+
+      // 6. Complete redemption
+      // A. Write redemption record
+      await claimRef.set({
+        id: claimId,
+        username: userNormalized,
+        code: codeNormalized,
+        createdAt: Date.now()
+      });
+
+      // B. Increment redeemed count on the code
+      await codeRef.update({
+        redeemedCount: FieldValue.increment(1)
+      });
+
+      // C. Reward points to the user
+      await userRef.update({
+        balancePoints: FieldValue.increment(codeData.rewardPoints)
+      });
+
+      // D. Send notification
+      await addNotification(
+        userNormalized,
+        'Code Redeemed! 🎁',
+        `Successfully redeemed code "${codeNormalized}". Added +${codeData.rewardPoints.toLocaleString()} PTS to your balance!`,
+        'task'
+      );
+
+      res.json({
+        success: true,
+        message: `Successfully redeemed code! Added +${codeData.rewardPoints.toLocaleString()} PTS to your account balance.`,
+        pointsCredited: codeData.rewardPoints
+      });
+    } catch (err) {
+      console.error('Code redemption error:', err);
+      res.status(500).json({ error: 'Failed to process redemption.' });
+    }
+  });
+
+  // 17. ADMIN: Get all redeem codes
+  app.get('/api/v1/admin/redeem-codes', async (req, res) => {
+    try {
+      const snaps = await db.collection('redeem_codes').get();
+      const list: any[] = [];
+      snaps.forEach((doc) => {
+        list.push(doc.data());
+      });
+      list.sort((a, b) => b.createdAt - a.createdAt);
+      res.json(list);
+    } catch (err) {
+      console.error('Fetch all redeem codes error:', err);
+      res.status(500).json({ error: 'Failed to load redeem codes.' });
+    }
+  });
+
+  // 18. ADMIN: Add/Edit redeem code
+  app.post('/api/v1/admin/redeem-codes', async (req, res) => {
+    try {
+      const { code, name, rewardPoints, description, image, eligibilityType, maxUsers, expiresAt } = req.body;
+      if (!code || !name || !rewardPoints || !description) {
+        return res.status(400).json({ error: 'Missing required code parameters (code, name, points, description).' });
+      }
+
+      const codeNormalized = String(code).toUpperCase().trim();
+      const codeRef = db.collection('redeem_codes').doc(codeNormalized);
+      const codeSnap = await codeRef.get();
+
+      const existingData = codeSnap.exists ? codeSnap.data() : null;
+
+      const newEvent = {
+        code: codeNormalized,
+        name: String(name).trim(),
+        rewardPoints: Number(rewardPoints),
+        description: String(description).trim(),
+        image: String(image || '').trim(),
+        eligibilityType: eligibilityType === 'limited' ? 'limited' : 'all',
+        maxUsers: eligibilityType === 'limited' ? Number(maxUsers || 0) : 0,
+        redeemedCount: existingData ? Number(existingData.redeemedCount || 0) : 0,
+        expiresAt: Number(expiresAt),
+        createdAt: existingData ? Number(existingData.createdAt || Date.now()) : Date.now(),
+      };
+
+      await codeRef.set(newEvent);
+      res.json({ success: true, message: 'Redemption code successfully saved.', data: newEvent });
+    } catch (err) {
+      console.error('Save redeem code error:', err);
+      res.status(500).json({ error: 'Failed to save redemption code.' });
+    }
+  });
+
+  // 19. ADMIN: Delete redeem code
+  app.post('/api/v1/admin/redeem-codes/delete', async (req, res) => {
+    try {
+      const { code } = req.body;
+      if (!code) {
+        return res.status(400).json({ error: 'Missing code parameter.' });
+      }
+
+      const codeNormalized = String(code).toUpperCase().trim();
+      await db.collection('redeem_codes').doc(codeNormalized).delete();
+      res.json({ success: true, message: 'Redemption code deleted successfully.' });
+    } catch (err) {
+      console.error('Delete redeem code error:', err);
+      res.status(500).json({ error: 'Failed to delete redemption code.' });
     }
   });
 

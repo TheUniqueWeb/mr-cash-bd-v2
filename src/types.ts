@@ -79,3 +79,17 @@ export interface SystemSettings {
   adsenseCode: string;
   supportLink: string;
 }
+
+export interface RedeemCode {
+  code: string;
+  name: string;
+  rewardPoints: number;
+  description: string;
+  image: string;
+  eligibilityType: 'all' | 'limited';
+  maxUsers: number;
+  redeemedCount: number;
+  expiresAt: number;
+  createdAt: number;
+}
+

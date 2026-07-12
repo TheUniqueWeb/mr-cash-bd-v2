@@ -18,11 +18,16 @@ export default function ReferralDashboard({ username }: ReferralDashboardProps) 
   const [copied, setCopied] = useState(false);
 
   const fetchReferralStats = async () => {
+    if (!username || typeof username !== 'string' || username.trim() === '') return;
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/v1/user/referrals-detailed/${username}`);
+      const res = await fetch(`/api/v1/user/referrals-detailed/${encodeURIComponent(username.trim())}`);
       if (!res.ok) throw new Error('Failed to fetch detailed referral statistics.');
+      const contentType = res.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        throw new Error("Invalid server response format. Expected JSON.");
+      }
       const json = await res.json();
       setData(json);
     } catch (err: any) {

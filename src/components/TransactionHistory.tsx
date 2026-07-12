@@ -17,6 +17,7 @@ import {
 
 interface TransactionHistoryProps {
   username: string;
+  isRefreshing?: boolean;
 }
 
 interface EarningLog {
@@ -43,7 +44,7 @@ interface WithdrawalLog {
   createdAt: number;
 }
 
-export default function TransactionHistory({ username }: TransactionHistoryProps) {
+export default function TransactionHistory({ username, isRefreshing = false }: TransactionHistoryProps) {
   const [activeTab, setActiveTab] = useState<'earnings' | 'withdrawals'>('earnings');
   const [earnings, setEarnings] = useState<EarningLog[]>([]);
   const [withdrawals, setWithdrawals] = useState<WithdrawalLog[]>([]);
@@ -51,25 +52,33 @@ export default function TransactionHistory({ username }: TransactionHistoryProps
   const [error, setError] = useState<string | null>(null);
 
   const fetchTransactions = async () => {
+    if (!username || typeof username !== 'string' || username.trim() === '') return;
     setLoading(true);
     setError(null);
     try {
       // Fetch concurrently
       const [earningsRes, withdrawalsRes] = await Promise.all([
-        fetch(`/api/v1/earnings/${username}`),
-        fetch(`/api/v1/withdrawals/${username}`)
+        fetch(`/api/v1/earnings/${encodeURIComponent(username.trim())}`),
+        fetch(`/api/v1/withdrawals/${encodeURIComponent(username.trim())}`)
       ]);
 
       if (!earningsRes.ok) throw new Error('Failed to load past task earnings.');
       if (!withdrawalsRes.ok) throw new Error('Failed to load withdrawal records.');
+
+      const earnType = earningsRes.headers.get("content-type");
+      const wdType = withdrawalsRes.headers.get("content-type");
+
+      if (!earnType || !earnType.includes("application/json") || !wdType || !wdType.includes("application/json")) {
+        throw new Error("Invalid response format received from server.");
+      }
 
       const [earningsData, withdrawalsData] = await Promise.all([
         earningsRes.json(),
         withdrawalsRes.json()
       ]);
 
-      setEarnings(earningsData);
-      setWithdrawals(withdrawalsData);
+      setEarnings(Array.isArray(earningsData) ? earningsData : []);
+      setWithdrawals(Array.isArray(withdrawalsData) ? withdrawalsData : []);
     } catch (err: any) {
       console.error('Error fetching transactions:', err);
       setError(err.message || 'An error occurred while loading transaction logs.');
@@ -81,6 +90,12 @@ export default function TransactionHistory({ username }: TransactionHistoryProps
   useEffect(() => {
     fetchTransactions();
   }, [username]);
+
+  useEffect(() => {
+    if (isRefreshing) {
+      fetchTransactions();
+    }
+  }, [isRefreshing]);
 
   // Compute total task earnings
   const totalTaskPoints = earnings.reduce((sum, item) => sum + (item.pointsCredited || 0), 0);

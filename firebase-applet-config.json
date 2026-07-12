@@ -1,9 +1,10 @@
 {
-    apiKey: "AIzaSyBhRj-HtvpaTkCzXd0CKUO1e3ux3Tsc21A",
-    authDomain: "mrcashbd-7e7e6.firebaseapp.com",
-    projectId: "mrcashbd-7e7e6",
-    storageBucket: "mrcashbd-7e7e6.firebasestorage.app",
-    messagingSenderId: "102350116678",
-    appId: "1:102350116678:web:796c8db3933dcef15eb747",
-    measurementId: "G-63YN20J1RH"
-  };
+  "projectId": "alpine-sanctuary-cv7sv",
+  "appId": "1:217284418929:web:28fcf46b3c1d712fca2ad0",
+  "apiKey": "AIzaSyCTGB4qXSf0lfRfqj7yqE-pZIbb7pKYR7o",
+  "authDomain": "alpine-sanctuary-cv7sv.firebaseapp.com",
+  "firestoreDatabaseId": "ai-studio-328a5165-abfc-4171-9abb-2d821959bfd3",
+  "storageBucket": "alpine-sanctuary-cv7sv.firebasestorage.app",
+  "messagingSenderId": "217284418929",
+  "measurementId": ""
+}

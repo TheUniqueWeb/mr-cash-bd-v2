@@ -27,7 +27,7 @@ interface AdminPanelProps {
 }
 
 export default function AdminPanel({ adminUser }: AdminPanelProps) {
-  const [activeSubTab, setActiveSubTab] = useState<'stats' | 'withdrawals' | 'users' | 'postbacks' | 'settings' | 'leaderboard'>('stats');
+  const [activeSubTab, setActiveSubTab] = useState<'stats' | 'withdrawals' | 'users' | 'postbacks' | 'settings' | 'leaderboard' | 'redeem_codes'>('stats');
   
   // States
   const [stats, setStats] = useState<SystemStats>({ totalMembers: 0, totalPaidBDT: 0, totalPointsEarned: 0, pendingWithdrawalsCount: 0 });
@@ -35,6 +35,17 @@ export default function AdminPanel({ adminUser }: AdminPanelProps) {
   const [users, setUsers] = useState<User[]>([]);
   const [postbacks, setPostbacks] = useState<PostbackLog[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Redeem code states
+  const [adminRedeemCodes, setAdminRedeemCodes] = useState<any[]>([]);
+  const [newCode, setNewCode] = useState('');
+  const [newName, setNewName] = useState('');
+  const [newRewardPoints, setNewRewardPoints] = useState(500);
+  const [newDescription, setNewDescription] = useState('');
+  const [newImage, setNewImage] = useState('');
+  const [newEligibilityType, setNewEligibilityType] = useState<'all' | 'limited'>('all');
+  const [newMaxUsers, setNewMaxUsers] = useState(100);
+  const [newExpiresAt, setNewExpiresAt] = useState('');
   
   // Leaderboard states
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
@@ -101,6 +112,12 @@ export default function AdminPanel({ adminUser }: AdminPanelProps) {
         setAdsenseCode(setts.adsenseCode || '');
         setSupportLink(setts.supportLink || 'https://t.me/mrcashbd');
       }
+
+      // Fetch redeem codes
+      const codesRes = await fetch('/api/v1/admin/redeem-codes');
+      if (codesRes.ok) {
+        setAdminRedeemCodes(await codesRes.json());
+      }
     } catch (e) {
       console.error('Failed to load admin panel details', e);
     } finally {
@@ -112,6 +129,77 @@ export default function AdminPanel({ adminUser }: AdminPanelProps) {
   useEffect(() => {
     fetchAllAdminData();
   }, []);
+
+  // Create / Save Redeem Code
+  const handleSaveRedeemCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCode || !newName || !newRewardPoints || !newExpiresAt) {
+      setActionMsg('Please fill in all required redeem code details.');
+      setTimeout(() => setActionMsg(''), 4000);
+      return;
+    }
+
+    setActionMsg('Saving redeem code...');
+    try {
+      const expirationTimestamp = new Date(newExpiresAt).getTime();
+      const res = await fetch('/api/v1/admin/redeem-codes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: newCode,
+          name: newName,
+          rewardPoints: Number(newRewardPoints),
+          description: newDescription,
+          image: newImage,
+          eligibilityType: newEligibilityType,
+          maxUsers: Number(newMaxUsers),
+          expiresAt: expirationTimestamp,
+        }),
+      });
+
+      if (res.ok) {
+        setActionMsg('Redemption code successfully saved!');
+        setNewCode('');
+        setNewName('');
+        setNewRewardPoints(500);
+        setNewDescription('');
+        setNewImage('');
+        setNewEligibilityType('all');
+        setNewMaxUsers(100);
+        setNewExpiresAt('');
+        fetchAllAdminData();
+      } else {
+        const err = await res.json();
+        setActionMsg(`Failed to save code: ${err.error || 'Unknown error'}`);
+      }
+    } catch (err: any) {
+      setActionMsg(`Save error: ${err.message}`);
+    }
+    setTimeout(() => setActionMsg(''), 4000);
+  };
+
+  // Delete Redeem Code
+  const handleDeleteRedeemCode = async (code: string) => {
+    if (!confirm(`Are you sure you want to delete redemption code: ${code}?`)) return;
+    setActionMsg('Deleting redeem code...');
+    try {
+      const res = await fetch('/api/v1/admin/redeem-codes/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code }),
+      });
+
+      if (res.ok) {
+        setActionMsg('Redemption code successfully deleted!');
+        fetchAllAdminData();
+      } else {
+        setActionMsg('Failed to delete redemption code.');
+      }
+    } catch (err: any) {
+      setActionMsg(`Delete error: ${err.message}`);
+    }
+    setTimeout(() => setActionMsg(''), 4000);
+  };
 
   // Handle Withdrawal approval or rejection
   const handleWithdrawalAction = async (withdrawalId: string, action: 'approve' | 'reject') => {
@@ -270,6 +358,15 @@ export default function AdminPanel({ adminUser }: AdminPanelProps) {
         >
           <Trophy className="w-3.5 h-3.5" />
           Leaderboard Rewards
+        </button>
+        <button
+          onClick={() => setActiveSubTab('redeem_codes')}
+          className={`px-5 py-3 font-bold font-display text-xs cursor-pointer tracking-wider uppercase border-b-2 transition flex items-center gap-1.5 ${
+            activeSubTab === 'redeem_codes' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'
+          }`}
+        >
+          <Crown className="w-3.5 h-3.5" />
+          Redeem Codes ({adminRedeemCodes.length})
         </button>
       </div>
 
@@ -909,6 +1006,209 @@ export default function AdminPanel({ adminUser }: AdminPanelProps) {
                   )}
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeSubTab === 'redeem_codes' && (
+        <div className="space-y-8 animate-fadeIn" id="admin-redeem-codes-tab">
+          {/* Header */}
+          <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+              <h3 className="text-lg font-black font-display text-slate-800 flex items-center gap-2">
+                <Crown className="w-5 h-5 text-blue-600 animate-bounce" />
+                Redemption Codes & Ongoing Events
+              </h3>
+              <p className="text-xs text-slate-500">Configure promotional reward codes, define maximum claim capacities, set expirations, and write descriptions for active events.</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            {/* Form Section */}
+            <form onSubmit={handleSaveRedeemCode} className="lg:col-span-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4 h-fit" id="admin-add-code-form">
+              <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2 border-b border-slate-100 pb-2">Create Promo Code</h4>
+              
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Redeem Code (No spaces)</label>
+                <input 
+                  type="text"
+                  placeholder="e.g. WELCOME2026"
+                  value={newCode}
+                  onChange={(e) => setNewCode(e.target.value.toUpperCase().replace(/\s+/g, ''))}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-black font-mono focus:bg-white focus:ring-1 focus:ring-blue-500 transition outline-none"
+                  required
+                />
+                <p className="text-[9px] text-slate-400 font-medium">This code must be typed exactly by members. e.g. WELCOME1000</p>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Event Name</label>
+                <input 
+                  type="text"
+                  placeholder="e.g. Ramadan Mubarak Special Bonus"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold focus:bg-white focus:ring-1 focus:ring-blue-500 transition outline-none"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Points Reward</label>
+                <input 
+                  type="number"
+                  placeholder="e.g. 500"
+                  value={newRewardPoints}
+                  onChange={(e) => setNewRewardPoints(Math.max(1, Number(e.target.value)))}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold focus:bg-white focus:ring-1 focus:ring-blue-500 transition outline-none"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Subject/Description</label>
+                <textarea 
+                  placeholder="Details of the event or qualification guidelines..."
+                  value={newDescription}
+                  onChange={(e) => setNewDescription(e.target.value)}
+                  rows={3}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-xs focus:bg-white focus:ring-1 focus:ring-blue-500 transition outline-none resize-none leading-relaxed"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Banner Image Link (Optional)</label>
+                <input 
+                  type="text"
+                  placeholder="e.g. https://images.unsplash.com/photo-..."
+                  value={newImage}
+                  onChange={(e) => setNewImage(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-xs focus:bg-white focus:ring-1 focus:ring-blue-500 transition outline-none font-mono"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Eligibility Rules</label>
+                <select
+                  value={newEligibilityType}
+                  onChange={(e) => setNewEligibilityType(e.target.value as 'all' | 'limited')}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold focus:bg-white focus:ring-1 focus:ring-blue-500 transition outline-none"
+                >
+                  <option value="all">Open to all (Limit 1 claim per user)</option>
+                  <option value="limited">First come, first served (Limited claims count)</option>
+                </select>
+              </div>
+
+              {newEligibilityType === 'limited' && (
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Claims Limit (Number of Users)</label>
+                  <input 
+                    type="number"
+                    value={newMaxUsers}
+                    onChange={(e) => setNewMaxUsers(Math.max(1, Number(e.target.value)))}
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold focus:bg-white focus:ring-1 focus:ring-blue-500 transition outline-none"
+                    required
+                  />
+                </div>
+              )}
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Expiration Date & Time</label>
+                <input 
+                  type="datetime-local"
+                  value={newExpiresAt}
+                  onChange={(e) => setNewExpiresAt(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold focus:bg-white focus:ring-1 focus:ring-blue-500 transition outline-none"
+                  required
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold font-display rounded-2xl text-xs tracking-widest uppercase transition cursor-pointer shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0"
+              >
+                Create Coupon Code
+              </button>
+            </form>
+
+            {/* List Section */}
+            <div className="lg:col-span-8 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
+              <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2 mb-2">Configured Coupon Codes</h4>
+
+              {adminRedeemCodes.length === 0 ? (
+                <div className="py-16 text-center text-xs text-slate-400 font-medium">
+                  No active redemption codes or ongoing event promotions found in DB. Use the configuration engine to create some!
+                </div>
+              ) : (
+                <div className="space-y-4 max-h-[700px] overflow-y-auto pr-2">
+                  {adminRedeemCodes.map((item) => {
+                    const isExpired = item.expiresAt < Date.now();
+                    const formattedExpiry = new Date(item.expiresAt).toLocaleString();
+                    const hasCap = item.eligibilityType === 'limited';
+
+                    return (
+                      <div key={item.code} className="p-4 bg-slate-50/50 rounded-2xl border border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition hover:bg-slate-50">
+                        <div className="flex gap-4 items-start min-w-0">
+                          {item.image ? (
+                            <img 
+                              src={item.image} 
+                              alt={item.name} 
+                              className="w-14 h-14 rounded-xl object-cover border border-slate-100 shrink-0"
+                              referrerPolicy="no-referrer"
+                            />
+                          ) : (
+                            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white shrink-0 shadow-sm">
+                              <Crown className="w-5 h-5" />
+                            </div>
+                          )}
+                          <div className="space-y-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-[10px] font-black font-mono">
+                                {item.code}
+                              </span>
+                              <span className={`text-[8px] px-1.5 py-0.5 font-black rounded tracking-wider uppercase ${
+                                isExpired ? 'bg-red-100 text-red-800' : 'bg-emerald-100 text-emerald-800'
+                              }`}>
+                                {isExpired ? 'EXPIRED' : 'ACTIVE'}
+                              </span>
+                            </div>
+                            <h5 className="text-xs font-black text-slate-800 truncate">{item.name}</h5>
+                            <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed">{item.description}</p>
+                            
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1 text-[10px] text-slate-400 font-bold">
+                              <span className="text-blue-600 font-extrabold bg-blue-50/70 border border-blue-100/30 px-1.5 py-0.5 rounded leading-none shrink-0">
+                                {item.rewardPoints.toLocaleString()} PTS
+                              </span>
+                              <span className="text-slate-200">•</span>
+                              <span>
+                                Expiry: <span className="text-slate-500">{formattedExpiry}</span>
+                              </span>
+                              <span className="text-slate-200">•</span>
+                              <span>
+                                Claimed: <span className="text-blue-600 font-extrabold">{item.redeemedCount}</span>
+                                {hasCap && <span className="text-slate-400">/{item.maxUsers}</span>}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="shrink-0 flex items-center self-end sm:self-center">
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteRedeemCode(item.code)}
+                            className="p-2.5 bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 rounded-xl transition border border-red-100 cursor-pointer"
+                            title="Delete Coupon Code"
+                          >
+                            <Trash className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -36,12 +36,17 @@ export default function Navbar({ user, activeTab, onTabChange, onOpenAuth, onLog
   const [isNotifOpen, setIsNotifOpen] = React.useState(false);
 
   const fetchNotifications = React.useCallback(async () => {
-    if (!user) return;
+    if (!user || !user.username || typeof user.username !== 'string' || user.username.trim() === '') return;
     try {
-      const response = await fetch(`/api/v1/notifications/${user.username}`);
+      const response = await fetch(`/api/v1/notifications/${encodeURIComponent(user.username.trim())}`);
       if (response.ok) {
-        const data = await response.json();
-        setNotifications(data);
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const data = await response.json();
+          setNotifications(Array.isArray(data) ? data : []);
+        } else {
+          console.warn("Expected JSON response from notifications API, but got:", contentType);
+        }
       }
     } catch (error) {
       console.error("Error fetching notifications:", error);
@@ -96,6 +101,7 @@ export default function Navbar({ user, activeTab, onTabChange, onOpenAuth, onLog
     { id: 'work', label: 'Offerwall', icon: <Briefcase className="w-4 h-4" /> },
     { id: 'referral', label: 'Refer & Earn', icon: <Share2 className="w-4 h-4" />, authRequired: true },
     { id: 'withdraw', label: 'Cash Out', icon: <DollarSign className="w-4 h-4" />, authRequired: true },
+    { id: 'redeem', label: 'Redeem Code', icon: <Gift className="w-4 h-4" />, authRequired: true },
     { id: 'settings', label: 'Settings', icon: <Settings className="w-4 h-4" />, authRequired: true },
     { id: 'admin', label: 'Admin Desk', icon: <Sliders className="w-4 h-4" />, adminRequired: true },
   ];
