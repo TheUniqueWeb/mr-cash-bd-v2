@@ -1640,9 +1640,12 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`MR CASH BD Server running at http://localhost:${PORT}`);
-  });
-}
+  // এই অংশটুকু বাদ দিন বা কমেন্ট করুন:
+/*
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`MR CASH BD Server running at http://localhost:${PORT}`);
+});
+*/
 
-startServer();
+// তার বদলে এটি লিখুন (Vercel-এর জন্য এক্সপোর্ট করা জরুরি):
+export default app;
