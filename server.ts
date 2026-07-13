@@ -885,9 +885,9 @@ drizzleDb.select().from(systemSettings).where(eq(systemSettings.id, 'global')).l
 
       let formattedOffers: any[] = [];
       try {
-        const response = await fetch(`https://www.cpalead.com/api/offers?id=3354341&country=${userCountryCode}&device=${detectedDevice}`, {
+        const response = await fetch(`https://www.cpalead.com/api/offers?id=3354341&country=${userCountryCode}`, {
           headers: { 'User-Agent': req.headers['user-agent'] || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
-          signal: AbortSignal.timeout(6000)
+          signal: AbortSignal.timeout(15000)
         });
         if (response.ok) {
           const cpaLeadData = await response.json();
