@@ -899,34 +899,6 @@ app.get("/api/v1/offers", async (req, res) => {
     } catch (fetchErr) {
       console.error("Error fetching dynamic CPALead offers:", fetchErr);
     }
-    if (formattedOffers.length === 0) {
-      formattedOffers = [
-        {
-          campid: "1092831",
-          title: "Bkash App Install & Transact",
-          description: "Download the official bKash app from the Google Play Store, register a new account, and perform a micro-transaction.",
-          link: "https://play.google.com/store/apps/details?id=com.bKash.customerapp",
-          payoutPoints: 8500,
-          payoutUSD: 0.85,
-          originalTitle: "Bkash App Install & Transact",
-          country: "BD",
-          device: "Android",
-          category: "App Installs"
-        },
-        {
-          campid: "1092832",
-          title: "Nagad Account Verification",
-          description: "Open a Nagad account using your national ID, complete KYC verification, and set your secure 4-digit PIN.",
-          link: "https://play.google.com/store/apps/details?id=com.konasl.nagad",
-          payoutPoints: 7e3,
-          payoutUSD: 0.7,
-          originalTitle: "Nagad Account Verification",
-          country: "BD",
-          device: "Mobile",
-          category: "Signups"
-        }
-      ];
-    }
     res.json({
       ip: clientIp,
       country: ipCheck.country,

@@ -955,38 +955,11 @@ drizzleDb.select().from(systemSettings).where(eq(systemSettings.id, 'global')).l
         console.error('Error fetching dynamic CPALead offers:', fetchErr);
       }
 
-      // Fallback offers if none available
-      if (formattedOffers.length === 0) {
-        formattedOffers = [
-          {
-            campid: '1092831',
-            title: 'Bkash App Install & Transact',
-            description: 'Download the official bKash app from the Google Play Store, register a new account, and perform a micro-transaction.',
-            link: 'https://play.google.com/store/apps/details?id=com.bKash.customerapp',
-            payoutPoints: 8500,
-            payoutUSD: 0.85,
-            originalTitle: 'Bkash App Install & Transact',
-            country: 'BD',
-            device: 'Android',
-            category: 'App Installs'
-          },
-          {
-            campid: '1092832',
-            title: 'Nagad Account Verification',
-            description: 'Open a Nagad account using your national ID, complete KYC verification, and set your secure 4-digit PIN.',
-            link: 'https://play.google.com/store/apps/details?id=com.konasl.nagad',
-            payoutPoints: 7000,
-            payoutUSD: 0.70,
-            originalTitle: 'Nagad Account Verification',
-            country: 'BD',
-            device: 'Mobile',
-            category: 'Signups'
-          }
-        ];
-      }
-
+      
+      // No fallback offers
 
       res.json({
+
         ip: clientIp,
         country: ipCheck.country,
         offers: formattedOffers
