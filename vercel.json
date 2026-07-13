@@ -1,25 +1,16 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "dist/server.cjs",
-      "use": "@vercel/node",
-      "config": {
-        "includeFiles": ["dist/**"]
-      }
-    }
-  ],
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "dist/server.cjs"
+      "dest": "api/index.js"
     },
     {
       "handle": "filesystem"
     },
     {
       "src": "/(.*)",
-      "dest": "dist/server.cjs"
+      "dest": "api/index.js"
     }
   ]
 }
