@@ -1,7 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
 import path from 'path';
-import { createServer as createViteServer } from 'vite';
 import { db as drizzleDb } from './src/db/index.ts';
 import { users, credentials, notifications, postbackLogs, withdrawals, systemSettings, redeemCodes, userRedemptions } from './src/db/schema.ts';
 import { eq, and, desc, asc, sql } from 'drizzle-orm';
@@ -1630,13 +1629,17 @@ drizzleDb.select().from(systemSettings).where(eq(systemSettings.id, 'global')).l
 // Serve static UI assets or use Vite in dev
 let viteDevServer: any = null;
 if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
-  createViteServer({
-    server: { middlewareMode: true },
-    appType: 'spa',
-  }).then((vite) => {
-    viteDevServer = vite;
+  import('vite').then(({ createServer }) => {
+    createServer({
+      server: { middlewareMode: true },
+      appType: 'spa',
+    }).then((vite) => {
+      viteDevServer = vite;
+    }).catch((err) => {
+      console.error('Failed to start Vite:', err);
+    });
   }).catch((err) => {
-    console.error('Failed to start Vite:', err);
+    console.error('Failed to import Vite:', err);
   });
 
   app.use((req, res, next) => {
