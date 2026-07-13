@@ -330,15 +330,15 @@ drizzleDb.select().from(systemSettings).where(eq(systemSettings.id, 'global')).l
   };
 
   // Helper: BD IP and Proxy check
-  async function checkIpBangladesh(ip: string): Promise<{ isBD: boolean; isProxy: boolean; country: string }> {
+  async function checkIpBangladesh(ip: string): Promise<{ isBD: boolean; isProxy: boolean; country: string; countryCode: string }> {
     if (!ip || ip === '127.0.0.1' || ip === '::1' || ip.startsWith('10.') || ip.startsWith('192.168.') || ip.startsWith('172.16.')) {
-      return { isBD: true, isProxy: false, country: 'Bangladesh (Local Host Bypass)' };
+      return { isBD: true, isProxy: false, country: 'Bangladesh (Local Host Bypass)', countryCode: 'BD' };
     }
     try {
       const res = await fetch(`https://ipapi.co/${ip}/json/`);
       if (res.ok) {
         const data = await res.json();
-        const countryCode = data.country_code; // "BD"
+        const countryCode = data.country_code || 'BD'; // "BD"
         const isBD = countryCode === 'BD';
         const isProxy = !!(
           data.security?.vpn ||
@@ -347,13 +347,13 @@ drizzleDb.select().from(systemSettings).where(eq(systemSettings.id, 'global')).l
           data.org?.toLowerCase().includes('vpn') ||
           data.asn?.toLowerCase().includes('hosting')
         );
-        return { isBD, isProxy, country: data.country_name || 'Unknown' };
+        return { isBD, isProxy, country: data.country_name || 'Unknown', countryCode };
       }
     } catch (e) {
       console.error('IP check error:', e);
     }
     // Fallback safe defaults to prevent lockouts during rate limits
-    return { isBD: true, isProxy: false, country: 'Bangladesh (Fallback)' };
+    return { isBD: true, isProxy: false, country: 'Bangladesh (Fallback)', countryCode: 'BD' };
   }
 
   // 1. AUTH API: User Registration
@@ -850,9 +850,14 @@ drizzleDb.select().from(systemSettings).where(eq(systemSettings.id, 'global')).l
       }
 
       // Security check: Bangladesh Only & Anti-VPN
-      let ipCheck = { isBD: true, isProxy: false, country: 'Bangladesh (Simulated)' };
-      if (sysSettings.vpnCheckEnabled && !isUserAdmin) {
+      let ipCheck = { isBD: true, isProxy: false, country: 'Bangladesh (Simulated)', countryCode: 'BD' };
+      try {
         ipCheck = await checkIpBangladesh(clientIp);
+      } catch (ipErr) {
+        console.error('Failed to resolve IP location:', ipErr);
+      }
+
+      if (sysSettings.vpnCheckEnabled && !isUserAdmin) {
         if (!ipCheck.isBD) {
           return res.status(403).json({
             error: 'ACCESS BLOCKED',
@@ -867,6 +872,110 @@ drizzleDb.select().from(systemSettings).where(eq(systemSettings.id, 'global')).l
         }
       }
 
+      const fallbackOffers = [
+        {
+          id: '1092831',
+          title: 'Bkash App Install & Transact',
+          description: 'Download the bKash app from the Google Play Store, register a new account, and perform a micro-transaction.',
+          payout: 0.85,
+          points: 8500,
+          category: 'App Installs',
+          timeMinutes: 10,
+          link: 'https://fasturl.cc/example_cpa_bkash',
+          imageUrl: 'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=150&auto=format&fit=crop&q=60'
+        },
+        {
+          id: '1092832',
+          title: 'Nagad Account Verification',
+          description: 'Open a Nagad account using your national ID, complete KYC verification, and set your secure 4-digit PIN.',
+          payout: 0.70,
+          points: 7000,
+          category: 'Signups',
+          timeMinutes: 8,
+          link: 'https://fasturl.cc/example_cpa_nagad',
+          imageUrl: 'https://images.unsplash.com/photo-1601597111158-2fceff270190?w=150&auto=format&fit=crop&q=60'
+        },
+        {
+          id: '1092833',
+          title: 'Daraz BD - Browse & Add to Cart',
+          description: 'Install Daraz BD shopping app, search for premium products, add 3 items to your shopping cart.',
+          payout: 0.35,
+          points: 3500,
+          category: 'App Installs',
+          timeMinutes: 5,
+          link: 'https://fasturl.cc/example_daraz_shopping',
+          imageUrl: 'https://images.unsplash.com/photo-1472851294608-062f824d29cc?w=150&auto=format&fit=crop&q=60'
+        },
+        {
+          id: '1092834',
+          title: 'Toffee - Premium Sports Streaming',
+          description: 'Install Toffee live TV app, register with your local BD mobile number and stream sports for 2 minutes.',
+          payout: 0.40,
+          points: 4000,
+          category: 'App Installs',
+          timeMinutes: 4,
+          link: 'https://fasturl.cc/example_toffee_stream',
+          imageUrl: 'https://images.unsplash.com/photo-1522869635100-9f4c5e86aa37?w=150&auto=format&fit=crop&q=60'
+        },
+        {
+          id: '1092835',
+          title: 'Chorki App Install & Register',
+          description: 'Download the Chorki Entertainment platform and complete a free SMS registration step.',
+          payout: 0.30,
+          points: 3000,
+          category: 'App Installs',
+          timeMinutes: 3,
+          link: 'https://fasturl.cc/example_chorki_app',
+          imageUrl: 'https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=150&auto=format&fit=crop&q=60'
+        },
+        {
+          id: '1092836',
+          title: 'Pathao - Book Your First Ride',
+          description: 'Open the Pathao app, complete a simple phone register, and look up rides nearby.',
+          payout: 0.50,
+          points: 5000,
+          category: 'Signups',
+          timeMinutes: 6,
+          link: 'https://fasturl.cc/example_pathao_ride',
+          imageUrl: 'https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?w=150&auto=format&fit=crop&q=60'
+        },
+        {
+          id: '1092837',
+          title: 'Consumer Habits & Shopping Survey',
+          description: 'Complete a quick 5-minute survey about your online shopping and mobile wallet preferences in Bangladesh.',
+          payout: 0.25,
+          points: 2500,
+          category: 'Surveys',
+          timeMinutes: 5,
+          link: 'https://fasturl.cc/example_consumer_survey',
+          imageUrl: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=150&auto=format&fit=crop&q=60'
+        },
+        {
+          id: '1092838',
+          title: 'Mobile Banking Experience Poll',
+          description: 'Share your feedback on local mobile banking services (bKash/Nagad) to earn easy rewards. Takes 3 minutes.',
+          payout: 0.20,
+          points: 2000,
+          category: 'Surveys',
+          timeMinutes: 3,
+          link: 'https://fasturl.cc/example_banking_poll',
+          imageUrl: 'https://images.unsplash.com/photo-1563013544-824ae1d704d3?w=150&auto=format&fit=crop&q=60'
+        }
+      ];
+
+      const formattedFallback = fallbackOffers.map(o => ({
+        campid: o.id,
+        title: o.title,
+        description: o.description,
+        link: o.link,
+        payoutPoints: o.points,
+        payoutUSD: o.payout,
+        originalTitle: o.title,
+        country: 'BD',
+        device: o.category === 'App Installs' ? 'Android' : 'Mobile',
+        category: o.category
+      }));
+
       let formattedOffers: any[] = [];
       try {
         const response = await fetch('https://www.cpalead.com/api/offers?id=3354341', {
@@ -876,7 +985,18 @@ drizzleDb.select().from(systemSettings).where(eq(systemSettings.id, 'global')).l
         if (response.ok) {
           const cpaLeadData = await response.json();
           if (cpaLeadData && Array.isArray(cpaLeadData.offers)) {
-            formattedOffers = cpaLeadData.offers.map((o: any) => {
+            const userCountryCode = String(ipCheck.countryCode || 'BD').toUpperCase().trim();
+            
+            // Filter offers where countries array includes user's country code, OR is empty (worldwide)
+            const matchedOffers = cpaLeadData.offers.filter((o: any) => {
+              if (!o.countries || !Array.isArray(o.countries) || o.countries.length === 0) {
+                return true;
+              }
+              const countriesUpper = o.countries.map((c: any) => String(c).toUpperCase().trim());
+              return countriesUpper.includes(userCountryCode);
+            });
+
+            formattedOffers = matchedOffers.map((o: any) => {
               let payoutUSD = parseFloat(o.amount) || 0;
               if (payoutUSD <= 0 && Array.isArray(o.events) && o.events.length > 0) {
                 payoutUSD = o.events.reduce((sum: number, ev: any) => sum + (parseFloat(ev.amount) || 0), 0);
@@ -922,115 +1042,11 @@ drizzleDb.select().from(systemSettings).where(eq(systemSettings.id, 'global')).l
           }
         }
       } catch (fetchErr) {
-        console.error('Error fetching dynamic CPALead offers, using high-quality static fallback:', fetchErr);
+        console.error('Error fetching dynamic CPALead offers:', fetchErr);
       }
 
-      if (formattedOffers.length === 0) {
-        // Fallback to high-quality curated BD offers
-        const fallbackOffers = [
-          {
-            id: '1092831',
-            title: 'Bkash App Install & Transact',
-            description: 'Download the bKash app from the Google Play Store, register a new account, and perform a micro-transaction.',
-            payout: 0.85,
-            points: 8500,
-            category: 'App Installs',
-            timeMinutes: 10,
-            link: 'https://fasturl.cc/example_cpa_bkash',
-            imageUrl: 'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=150&auto=format&fit=crop&q=60'
-          },
-          {
-            id: '1092832',
-            title: 'Nagad Account Verification',
-            description: 'Open a Nagad account using your national ID, complete KYC verification, and set your secure 4-digit PIN.',
-            payout: 0.70,
-            points: 7000,
-            category: 'Signups',
-            timeMinutes: 8,
-            link: 'https://fasturl.cc/example_cpa_nagad',
-            imageUrl: 'https://images.unsplash.com/photo-1601597111158-2fceff270190?w=150&auto=format&fit=crop&q=60'
-          },
-          {
-            id: '1092833',
-            title: 'Daraz BD - Browse & Add to Cart',
-            description: 'Install Daraz BD shopping app, search for premium products, add 3 items to your shopping cart.',
-            payout: 0.35,
-            points: 3500,
-            category: 'App Installs',
-            timeMinutes: 5,
-            link: 'https://fasturl.cc/example_daraz_shopping',
-            imageUrl: 'https://images.unsplash.com/photo-1472851294608-062f824d29cc?w=150&auto=format&fit=crop&q=60'
-          },
-          {
-            id: '1092834',
-            title: 'Toffee - Premium Sports Streaming',
-            description: 'Install Toffee live TV app, register with your local BD mobile number and stream sports for 2 minutes.',
-            payout: 0.40,
-            points: 4000,
-            category: 'App Installs',
-            timeMinutes: 4,
-            link: 'https://fasturl.cc/example_toffee_stream',
-            imageUrl: 'https://images.unsplash.com/photo-1522869635100-9f4c5e86aa37?w=150&auto=format&fit=crop&q=60'
-          },
-          {
-            id: '1092835',
-            title: 'Chorki App Install & Register',
-            description: 'Download the Chorki Entertainment platform and complete a free SMS registration step.',
-            payout: 0.30,
-            points: 3000,
-            category: 'App Installs',
-            timeMinutes: 3,
-            link: 'https://fasturl.cc/example_chorki_app',
-            imageUrl: 'https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=150&auto=format&fit=crop&q=60'
-          },
-          {
-            id: '1092836',
-            title: 'Pathao - Book Your First Ride',
-            description: 'Open the Pathao app, complete a simple phone register, and look up rides nearby.',
-            payout: 0.50,
-            points: 5000,
-            category: 'Signups',
-            timeMinutes: 6,
-            link: 'https://fasturl.cc/example_pathao_ride',
-            imageUrl: 'https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?w=150&auto=format&fit=crop&q=60'
-          },
-          {
-            id: '1092837',
-            title: 'Consumer Habits & Shopping Survey',
-            description: 'Complete a quick 5-minute survey about your online shopping and mobile wallet preferences in Bangladesh.',
-            payout: 0.25,
-            points: 2500,
-            category: 'Surveys',
-            timeMinutes: 5,
-            link: 'https://fasturl.cc/example_consumer_survey',
-            imageUrl: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=150&auto=format&fit=crop&q=60'
-          },
-          {
-            id: '1092838',
-            title: 'Mobile Banking Experience Poll',
-            description: 'Share your feedback on local mobile banking services (bKash/Nagad) to earn easy rewards. Takes 3 minutes.',
-            payout: 0.20,
-            points: 2000,
-            category: 'Surveys',
-            timeMinutes: 3,
-            link: 'https://fasturl.cc/example_banking_poll',
-            imageUrl: 'https://images.unsplash.com/photo-1563013544-824ae1d704d3?w=150&auto=format&fit=crop&q=60'
-          }
-        ];
-
-        formattedOffers = fallbackOffers.map(o => ({
-          campid: o.id,
-          title: o.title,
-          description: o.description,
-          link: o.link,
-          payoutPoints: o.points,
-          payoutUSD: o.payout,
-          originalTitle: o.title,
-          country: 'BD',
-          device: o.category === 'App Installs' ? 'Android' : 'Mobile',
-          category: o.category
-        }));
-      }
+      // Always blend hand-curated Bangladesh premium offers with dynamic ones to offer maximum organic tasks
+      formattedOffers = [...formattedOffers, ...formattedFallback];
 
       res.json({
         ip: clientIp,

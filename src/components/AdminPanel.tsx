@@ -659,7 +659,7 @@ export default function AdminPanel({ adminUser }: AdminPanelProps) {
         <div className="space-y-4 animate-fadeIn" id="admin-postback-ledger">
           <div>
             <h3 className="text-base font-bold font-display text-slate-800">CPA Postback Lead Registry</h3>
-            <p className="text-xs text-slate-500">View real-time conversions received from CPALead redirect networks.</p>
+            <p className="text-xs text-slate-500">View real-time conversions received from premium partner networks.</p>
           </div>
 
           {postbacks.length === 0 ? (

@@ -168,7 +168,7 @@ export default function App() {
           MR CASH BD v1.4.0 Secured Escrow Ledger
         </div>
         <p className="max-w-md mx-auto leading-relaxed">
-          The white-label CPA marketing platform. All transactions and micro-rewards are monitored under strict anti-vpn security rules. Authorized by CPALead Integration Network.
+          The white-label CPA marketing platform. All transactions and micro-rewards are monitored under strict anti-vpn security rules. Authorized by Premium Global Integration Network.
         </p>
         <div className="pt-2 flex items-center justify-center gap-1 text-[10px] text-slate-300">
           <span>Made with</span>
