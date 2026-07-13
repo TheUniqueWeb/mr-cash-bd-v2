@@ -88,7 +88,10 @@ var systemSettings = pgTable("system_settings", {
   minWithdrawRechargePoints: integer("min_withdraw_recharge_points").default(2e3).notNull(),
   minWithdrawBankPoints: integer("min_withdraw_bank_points").default(1e4).notNull(),
   adsenseCode: text("adsense_code").default("").notNull(),
-  supportLink: text("support_link").default("https://t.me/mrcashbd").notNull()
+  supportLink: text("support_link").default("https://t.me/mrcashbd").notNull(),
+  maintenanceMode: boolean("maintenance_mode").default(false).notNull(),
+  maintenanceMessage: text("maintenance_message").default("System is undergoing maintenance. Please check back shortly.").notNull(),
+  broadcastMessage: text("broadcast_message").default("").notNull()
 });
 var redeemCodes = pgTable("redeem_codes", {
   code: text("code").primaryKey(),
@@ -357,7 +360,10 @@ var sysSettings = {
   minWithdrawBankPoints: 1e4,
   // 100 BDT
   adsenseCode: "",
-  supportLink: "https://t.me/mrcashbd"
+  supportLink: "https://t.me/mrcashbd",
+  maintenanceMode: false,
+  maintenanceMessage: "System is undergoing maintenance. Please check back shortly.",
+  broadcastMessage: ""
 };
 db.select().from(systemSettings).where(eq(systemSettings.id, "global")).limit(1).then((rows) => {
   if (rows.length > 0) {
@@ -368,7 +374,10 @@ db.select().from(systemSettings).where(eq(systemSettings.id, "global")).limit(1)
       minWithdrawRechargePoints: rows[0].minWithdrawRechargePoints,
       minWithdrawBankPoints: rows[0].minWithdrawBankPoints,
       adsenseCode: rows[0].adsenseCode,
-      supportLink: rows[0].supportLink
+      supportLink: rows[0].supportLink,
+      maintenanceMode: rows[0].maintenanceMode,
+      maintenanceMessage: rows[0].maintenanceMessage,
+      broadcastMessage: rows[0].broadcastMessage
     };
   } else {
     db.insert(systemSettings).values({
@@ -405,21 +414,21 @@ var getClientIp = (req) => {
 };
 async function checkIpBangladesh(ip) {
   if (!ip || ip === "127.0.0.1" || ip === "::1" || ip.startsWith("10.") || ip.startsWith("192.168.") || ip.startsWith("172.16.")) {
-    return { isBD: true, isProxy: false, country: "Bangladesh (Local Host Bypass)" };
+    return { isBD: true, isProxy: false, country: "Bangladesh (Local Host Bypass)", countryCode: "BD" };
   }
   try {
     const res = await fetch(`https://ipapi.co/${ip}/json/`);
     if (res.ok) {
       const data = await res.json();
-      const countryCode = data.country_code;
+      const countryCode = data.country_code || "BD";
       const isBD = countryCode === "BD";
       const isProxy = !!(data.security?.vpn || data.security?.proxy || data.org?.toLowerCase().includes("hosting") || data.org?.toLowerCase().includes("vpn") || data.asn?.toLowerCase().includes("hosting"));
-      return { isBD, isProxy, country: data.country_name || "Unknown" };
+      return { isBD, isProxy, country: data.country_name || "Unknown", countryCode };
     }
   } catch (e) {
     console.error("IP check error:", e);
   }
-  return { isBD: true, isProxy: false, country: "Bangladesh (Fallback)" };
+  return { isBD: true, isProxy: false, country: "Bangladesh (Fallback)", countryCode: "BD" };
 }
 app.post("/api/v1/auth/register", async (req, res) => {
   try {
@@ -802,9 +811,13 @@ app.get("/api/v1/offers", async (req, res) => {
         isUserAdmin = !!ud.isAdmin;
       }
     }
-    let ipCheck = { isBD: true, isProxy: false, country: "Bangladesh (Simulated)" };
-    if (sysSettings.vpnCheckEnabled && !isUserAdmin) {
+    let ipCheck = { isBD: true, isProxy: false, country: "Bangladesh (Simulated)", countryCode: "BD" };
+    try {
       ipCheck = await checkIpBangladesh(clientIp);
+    } catch (ipErr) {
+      console.error("Failed to resolve IP location:", ipErr);
+    }
+    if (sysSettings.vpnCheckEnabled && !isUserAdmin) {
       if (!ipCheck.isBD) {
         return res.status(403).json({
           error: "ACCESS BLOCKED",
@@ -818,108 +831,102 @@ app.get("/api/v1/offers", async (req, res) => {
         });
       }
     }
-    const cpaOffers = [
-      {
-        id: "1092831",
-        title: "Bkash App Install & Transact",
-        description: "Download the bKash app from the Google Play Store, register a new account, and perform a micro-transaction.",
-        payout: 0.85,
-        points: 8500,
-        category: "App Installs",
-        timeMinutes: 10,
-        link: "https://fasturl.cc/example_cpa_bkash",
-        imageUrl: "https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=150&auto=format&fit=crop&q=60"
-      },
-      {
-        id: "1092832",
-        title: "Nagad Account Verification",
-        description: "Open a Nagad account using your national ID, complete KYC verification, and set your secure 4-digit PIN.",
-        payout: 0.7,
-        points: 7e3,
-        category: "Signups",
-        timeMinutes: 8,
-        link: "https://fasturl.cc/example_cpa_nagad",
-        imageUrl: "https://images.unsplash.com/photo-1601597111158-2fceff270190?w=150&auto=format&fit=crop&q=60"
-      },
-      {
-        id: "1092833",
-        title: "Daraz BD - Browse & Add to Cart",
-        description: "Install Daraz BD shopping app, search for premium products, add 3 items to your shopping cart.",
-        payout: 0.35,
-        points: 3500,
-        category: "App Installs",
-        timeMinutes: 5,
-        link: "https://fasturl.cc/example_daraz_shopping",
-        imageUrl: "https://images.unsplash.com/photo-1472851294608-062f824d29cc?w=150&auto=format&fit=crop&q=60"
-      },
-      {
-        id: "1092834",
-        title: "Toffee - Premium Sports Streaming",
-        description: "Install Toffee live TV app, register with your local BD mobile number and stream sports for 2 minutes.",
-        payout: 0.4,
-        points: 4e3,
-        category: "App Installs",
-        timeMinutes: 4,
-        link: "https://fasturl.cc/example_toffee_stream",
-        imageUrl: "https://images.unsplash.com/photo-1522869635100-9f4c5e86aa37?w=150&auto=format&fit=crop&q=60"
-      },
-      {
-        id: "1092835",
-        title: "Chorki App Install & Register",
-        description: "Download the Chorki Entertainment platform and complete a free SMS registration step.",
-        payout: 0.3,
-        points: 3e3,
-        category: "App Installs",
-        timeMinutes: 3,
-        link: "https://fasturl.cc/example_chorki_app",
-        imageUrl: "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=150&auto=format&fit=crop&q=60"
-      },
-      {
-        id: "1092836",
-        title: "Pathao - Book Your First Ride",
-        description: "Open the Pathao app, complete a simple phone register, and look up rides nearby.",
-        payout: 0.5,
-        points: 5e3,
-        category: "Signups",
-        timeMinutes: 6,
-        link: "https://fasturl.cc/example_pathao_ride",
-        imageUrl: "https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?w=150&auto=format&fit=crop&q=60"
-      },
-      {
-        id: "1092837",
-        title: "Consumer Habits & Shopping Survey",
-        description: "Complete a quick 5-minute survey about your online shopping and mobile wallet preferences in Bangladesh.",
-        payout: 0.25,
-        points: 2500,
-        category: "Surveys",
-        timeMinutes: 5,
-        link: "https://fasturl.cc/example_consumer_survey",
-        imageUrl: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=150&auto=format&fit=crop&q=60"
-      },
-      {
-        id: "1092838",
-        title: "Mobile Banking Experience Poll",
-        description: "Share your feedback on local mobile banking services (bKash/Nagad) to earn easy rewards. Takes 3 minutes.",
-        payout: 0.2,
-        points: 2e3,
-        category: "Surveys",
-        timeMinutes: 3,
-        link: "https://fasturl.cc/example_banking_poll",
-        imageUrl: "https://images.unsplash.com/photo-1563013544-824ae1d704d3?w=150&auto=format&fit=crop&q=60"
+    const userCountryCode = String(ipCheck.countryCode || "BD").toUpperCase().trim();
+    const userAgent = String(req.headers["user-agent"] || "").toLowerCase();
+    let detectedDevice = "mobile";
+    if (userAgent.includes("android")) {
+      detectedDevice = "android";
+    } else if (userAgent.includes("iphone") || userAgent.includes("ipad")) {
+      detectedDevice = "ios";
+    } else if (userAgent.includes("windows") || userAgent.includes("macintosh") || userAgent.includes("linux")) {
+      detectedDevice = "desktop";
+    }
+    let formattedOffers = [];
+    try {
+      const response = await fetch(`https://www.cpalead.com/api/offers?id=3354341&country=${userCountryCode}`, {
+        headers: { "User-Agent": req.headers["user-agent"] || "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" },
+        signal: AbortSignal.timeout(15e3)
+      });
+      if (response.ok) {
+        const cpaLeadData = await response.json();
+        if (cpaLeadData && Array.isArray(cpaLeadData.offers)) {
+          const matchedOffers = cpaLeadData.offers.filter((o) => {
+            if (!o.countries || !Array.isArray(o.countries) || o.countries.length === 0) {
+              return true;
+            }
+            const countriesUpper = o.countries.map((c) => String(c).toUpperCase().trim());
+            return countriesUpper.includes(userCountryCode);
+          });
+          formattedOffers = matchedOffers.map((o) => {
+            let payoutUSD = parseFloat(o.amount) || 0;
+            if (payoutUSD <= 0 && Array.isArray(o.events) && o.events.length > 0) {
+              payoutUSD = o.events.reduce((sum, ev) => sum + (parseFloat(ev.amount) || 0), 0);
+            }
+            const payoutPoints = Math.round(payoutUSD * sysSettings.conversionRate);
+            let category = "Signups";
+            const pType = String(o.payout_type || "").toUpperCase();
+            const deviceType = String(o.device || "").toLowerCase();
+            const titleLower = String(o.title || "").toLowerCase();
+            const descLower = String(o.description || "").toLowerCase();
+            if (pType === "CPI" || deviceType.includes("android") || deviceType.includes("ios") || deviceType.includes("mobile")) {
+              category = "App Installs";
+            } else if (titleLower.includes("survey") || titleLower.includes("poll") || descLower.includes("survey") || descLower.includes("poll") || descLower.includes("opinion")) {
+              category = "Surveys";
+            }
+            let normalizedDevice = "Mobile";
+            if (deviceType.includes("android")) {
+              normalizedDevice = "Android";
+            } else if (deviceType.includes("ios") || deviceType.includes("iphone") || deviceType.includes("ipad")) {
+              normalizedDevice = "iOS";
+            } else if (deviceType.includes("desktop")) {
+              normalizedDevice = "Desktop";
+            }
+            return {
+              campid: String(o.id),
+              title: String(o.title || "Premium Offer"),
+              description: String(o.description || o.conversion || "Complete this easy action to receive your points reward!"),
+              link: String(o.link || ""),
+              payoutPoints,
+              payoutUSD,
+              originalTitle: String(o.title || "Premium Offer"),
+              country: Array.isArray(o.countries) ? o.countries.join(", ") : "BD",
+              device: normalizedDevice,
+              category
+            };
+          });
+        }
       }
-    ];
-    const formattedOffers = cpaOffers.map((o) => ({
-      campid: o.id,
-      title: o.title,
-      description: o.description,
-      link: o.link,
-      payoutPoints: o.points,
-      payoutUSD: o.payout,
-      originalTitle: o.title,
-      country: "BD",
-      device: o.category === "App Installs" ? "Android" : "Mobile",
-      category: o.category
-    }));
+    } catch (fetchErr) {
+      console.error("Error fetching dynamic CPALead offers:", fetchErr);
+    }
+    if (formattedOffers.length === 0) {
+      formattedOffers = [
+        {
+          campid: "1092831",
+          title: "Bkash App Install & Transact",
+          description: "Download the official bKash app from the Google Play Store, register a new account, and perform a micro-transaction.",
+          link: "https://play.google.com/store/apps/details?id=com.bKash.customerapp",
+          payoutPoints: 8500,
+          payoutUSD: 0.85,
+          originalTitle: "Bkash App Install & Transact",
+          country: "BD",
+          device: "Android",
+          category: "App Installs"
+        },
+        {
+          campid: "1092832",
+          title: "Nagad Account Verification",
+          description: "Open a Nagad account using your national ID, complete KYC verification, and set your secure 4-digit PIN.",
+          link: "https://play.google.com/store/apps/details?id=com.konasl.nagad",
+          payoutPoints: 7e3,
+          payoutUSD: 0.7,
+          originalTitle: "Nagad Account Verification",
+          country: "BD",
+          device: "Mobile",
+          category: "Signups"
+        }
+      ];
+    }
     res.json({
       ip: clientIp,
       country: ipCheck.country,
@@ -930,9 +937,11 @@ app.get("/api/v1/offers", async (req, res) => {
     res.status(500).json({ error: "Failed to retrieve available premium offers." });
   }
 });
-app.get("/api/v1/offers/redirect", (req, res) => {
+var handleRedirect = (req, res) => {
   try {
-    const { offerId, username, link } = req.query;
+    const offerId = req.query.offerId;
+    const username = req.query.username || req.query.userId;
+    const link = req.query.link || req.query.originalLink;
     if (!offerId || !username || !link) {
       return res.status(400).send("Missing query parameters for redirection");
     }
@@ -947,7 +956,9 @@ app.get("/api/v1/offers/redirect", (req, res) => {
     console.error("Redirect error:", err);
     res.status(500).send("Failed to parse offer redirect link.");
   }
-});
+};
+app.get("/api/v1/offers/redirect", handleRedirect);
+app.get("/api/v1/redirect", handleRedirect);
 app.get("/api/v1/postback/cpalead", async (req, res) => {
   try {
     const { userId, payout, ip, leadId, campaignName, password } = req.query;
@@ -1172,6 +1183,39 @@ app.post("/api/v1/admin/withdrawals/action", async (req, res) => {
   } catch (err) {
     console.error("Withdraw action error:", err);
     res.status(500).json({ error: "Server action error." });
+  }
+});
+app.get("/api/v1/admin/users/all", async (req, res) => {
+  try {
+    const allUsers = await db.query.users.findMany({
+      orderBy: (users2, { desc: desc2 }) => [desc2(users2.createdAt)]
+    });
+    res.json(allUsers);
+  } catch (err) {
+    console.error("Fetch all users error:", err);
+    res.status(500).json({ error: "Failed to fetch users." });
+  }
+});
+app.delete("/api/v1/admin/users/:username", async (req, res) => {
+  try {
+    const { username } = req.params;
+    const usernameNormalized = username.toLowerCase().trim();
+    await db.delete(schema.users).where(eq(schema.users.username, usernameNormalized));
+    res.json({ success: true, message: "User deleted successfully" });
+  } catch (err) {
+    console.error("Delete user error:", err);
+    res.status(500).json({ error: "Failed to delete user" });
+  }
+});
+app.post("/api/v1/admin/broadcast", async (req, res) => {
+  try {
+    const { message } = req.body;
+    sysSettings.broadcastMessage = String(message || "");
+    await db.update(systemSettings).set({ broadcastMessage: sysSettings.broadcastMessage }).where(eq(systemSettings.id, "global"));
+    res.json({ success: true, message: "Broadcast updated successfully." });
+  } catch (err) {
+    console.error("Broadcast error:", err);
+    res.status(500).json({ error: "Failed to update broadcast." });
   }
 });
 app.get("/api/v1/admin/users", async (req, res) => {

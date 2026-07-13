@@ -71,6 +71,9 @@ export const systemSettings = pgTable('system_settings', {
   minWithdrawBankPoints: integer('min_withdraw_bank_points').default(10000).notNull(),
   adsenseCode: text('adsense_code').default('').notNull(),
   supportLink: text('support_link').default('https://t.me/mrcashbd').notNull(),
+  maintenanceMode: boolean('maintenance_mode').default(false).notNull(),
+  maintenanceMessage: text('maintenance_message').default('System is undergoing maintenance. Please check back shortly.').notNull(),
+  broadcastMessage: text('broadcast_message').default('').notNull(),
 });
 
 // 7. Redeem Codes table

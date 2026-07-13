@@ -61,6 +61,9 @@ export default function AdminPanel({ adminUser }: AdminPanelProps) {
   const [minWithdrawBankPoints, setMinWithdrawBankPoints] = useState(10000);
   const [adsenseCode, setAdsenseCode] = useState('');
   const [supportLink, setSupportLink] = useState('https://t.me/mrcashbd');
+  const [maintenanceMode, setMaintenanceMode] = useState(false);
+  const [maintenanceMessage, setMaintenanceMessage] = useState('System is undergoing maintenance. Please check back shortly.');
+  const [broadcastMessage, setBroadcastMessage] = useState('');
 
   const [loading, setLoading] = useState(false);
   const [actionMsg, setActionMsg] = useState('');
@@ -111,6 +114,9 @@ export default function AdminPanel({ adminUser }: AdminPanelProps) {
         setMinWithdrawBankPoints(setts.minWithdrawBankPoints);
         setAdsenseCode(setts.adsenseCode || '');
         setSupportLink(setts.supportLink || 'https://t.me/mrcashbd');
+        setMaintenanceMode(setts.maintenanceMode || false);
+        setMaintenanceMessage(setts.maintenanceMessage || '');
+        setBroadcastMessage(setts.broadcastMessage || '');
       }
 
       // Fetch redeem codes
@@ -141,6 +147,7 @@ export default function AdminPanel({ adminUser }: AdminPanelProps) {
 
     setActionMsg('Saving redeem code...');
     try {
+      
       const expirationTimestamp = new Date(newExpiresAt).getTime();
       const res = await fetch('/api/v1/admin/redeem-codes', {
         method: 'POST',
@@ -188,7 +195,6 @@ export default function AdminPanel({ adminUser }: AdminPanelProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code }),
       });
-
       if (res.ok) {
         setActionMsg('Redemption code successfully deleted!');
         fetchAllAdminData();
@@ -219,6 +225,26 @@ export default function AdminPanel({ adminUser }: AdminPanelProps) {
       }
     } catch (err: any) {
       setActionMsg(`Action error: ${err.message}`);
+    }
+    setTimeout(() => setActionMsg(''), 4000);
+  };
+
+  // Handle Delete User
+  const handleDeleteUser = async (username: string) => {
+    if (!confirm(`Are you sure you want to completely delete user: ${username}?`)) return;
+    setActionMsg('Deleting user...');
+    try {
+      const res = await fetch(`/api/v1/admin/users/${username}`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        setActionMsg(`User ${username} successfully deleted!`);
+        fetchAllAdminData();
+      } else {
+        setActionMsg('Failed to delete user.');
+      }
+    } catch (err: any) {
+      setActionMsg(`Error: ${err.message}`);
     }
     setTimeout(() => setActionMsg(''), 4000);
   };
@@ -254,15 +280,13 @@ export default function AdminPanel({ adminUser }: AdminPanelProps) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          vpnCheckEnabled,
-          conversionRate,
-          pointsToBdtRate,
-          minWithdrawRechargePoints,
-          minWithdrawBankPoints,
-          adsenseCode,
-          supportLink
+          vpnCheckEnabled, conversionRate, pointsToBdtRate, 
+          minWithdrawRechargePoints, minWithdrawBankPoints, 
+          adsenseCode, supportLink,
+          maintenanceMode, maintenanceMessage, broadcastMessage
         }),
       });
+
       if (res.ok) {
         setActionMsg('System parameters successfully saved!');
         fetchAllAdminData();
@@ -292,175 +316,82 @@ export default function AdminPanel({ adminUser }: AdminPanelProps) {
           </h2>
           <p className="text-sm text-slate-500">Welcome, <strong>{adminUser.username}</strong> ({adminUser.email}). Modify withdrawal tickets, system rates, or ban fraudsters.</p>
         </div>
-        <button 
-          onClick={fetchAllAdminData}
-          className="px-4 py-2 bg-blue-50 border border-blue-100 text-blue-600 font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer hover:bg-blue-100/50"
-          id="admin-sync-button"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-          Force Sync Database
-        </button>
+        
+        {loading && (
+          <div className="flex items-center gap-2 text-xs font-bold text-slate-400 bg-slate-50 px-3 py-1.5 rounded-full">
+            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+            SYNCING
+          </div>
+        )}
       </div>
 
       {actionMsg && (
-        <div className="p-3 text-sm font-semibold bg-blue-50 border border-blue-100 text-blue-800 rounded-xl animate-bounce">
+        <div className="p-4 bg-emerald-50 border border-emerald-100 text-emerald-700 rounded-xl font-bold flex items-center gap-2 animate-fadeIn shadow-sm">
+          <CheckCircle className="w-5 h-5" />
           {actionMsg}
         </div>
       )}
 
-      {/* ADMIN SUB NAVIGATION */}
-      <div className="flex flex-wrap border-b border-slate-200 gap-1.5 pb-0.5">
-        <button
-          onClick={() => setActiveSubTab('stats')}
-          className={`px-5 py-3 font-bold font-display text-xs cursor-pointer tracking-wider uppercase border-b-2 transition ${
-            activeSubTab === 'stats' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'
-          }`}
-        >
-          Stats & Revenue
-        </button>
-        <button
-          onClick={() => setActiveSubTab('withdrawals')}
-          className={`px-5 py-3 font-bold font-display text-xs cursor-pointer tracking-wider uppercase border-b-2 transition flex items-center gap-1.5 ${
-            activeSubTab === 'withdrawals' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'
-          }`}
-        >
-          Withdrawals ({withdrawals.filter(w => w.status === 'pending').length})
-        </button>
-        <button
-          onClick={() => setActiveSubTab('users')}
-          className={`px-5 py-3 font-bold font-display text-xs cursor-pointer tracking-wider uppercase border-b-2 transition ${
-            activeSubTab === 'users' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'
-          }`}
-        >
-          Users list ({users.length})
-        </button>
-        <button
-          onClick={() => setActiveSubTab('postbacks')}
-          className={`px-5 py-3 font-bold font-display text-xs cursor-pointer tracking-wider uppercase border-b-2 transition ${
-            activeSubTab === 'postbacks' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'
-          }`}
-        >
-          Postback Leads ({postbacks.length})
-        </button>
-        <button
-          onClick={() => setActiveSubTab('settings')}
-          className={`px-5 py-3 font-bold font-display text-xs cursor-pointer tracking-wider uppercase border-b-2 transition ${
-            activeSubTab === 'settings' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'
-          }`}
-        >
-          Global Configuration
-        </button>
-        <button
-          onClick={() => setActiveSubTab('leaderboard')}
-          className={`px-5 py-3 font-bold font-display text-xs cursor-pointer tracking-wider uppercase border-b-2 transition flex items-center gap-1.5 ${
-            activeSubTab === 'leaderboard' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'
-          }`}
-        >
-          <Trophy className="w-3.5 h-3.5" />
-          Leaderboard Rewards
-        </button>
-        <button
-          onClick={() => setActiveSubTab('redeem_codes')}
-          className={`px-5 py-3 font-bold font-display text-xs cursor-pointer tracking-wider uppercase border-b-2 transition flex items-center gap-1.5 ${
-            activeSubTab === 'redeem_codes' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'
-          }`}
-        >
-          <Crown className="w-3.5 h-3.5" />
-          Redeem Codes ({adminRedeemCodes.length})
-        </button>
+      {/* Primary Navigation Tabs */}
+      <div className="flex flex-wrap gap-2">
+        {[
+          { id: 'overview', label: 'Platform Stats', icon: TrendingUp },
+          { id: 'withdrawals', label: 'Withdrawal Tickets', icon: Wallet },
+          { id: 'users', label: 'Manage Users', icon: Users },
+          { id: 'postbacks', label: 'CPA Lead Logs', icon: Target },
+          { id: 'redeem', label: 'Redeem Codes', icon: Gift },
+          { id: 'settings', label: 'Global Settings', icon: Settings }
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveSubTab(tab.id)}
+            className={`px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition-all ${
+              activeSubTab === tab.id
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
+                : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50 hover:text-slate-700'
+            }`}
+            id={`admin-tab-${tab.id}`}
+          >
+            <tab.icon className={`w-4 h-4 ${activeSubTab === tab.id ? 'text-blue-200' : 'text-slate-400'}`} />
+            {tab.label}
+          </button>
+        ))}
       </div>
 
-      {/* SUB-TABS INTERFACE */}
-
-      {/* 1. STATS TAB */}
-      {activeSubTab === 'stats' && (
-        <div className="space-y-8 animate-fadeIn">
-          {/* Card stats */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-1">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Total Members</p>
-              <h3 className="text-3xl font-black font-display text-slate-800">{stats.totalMembers}</h3>
-              <p className="text-xs text-slate-400">Database entries</p>
-            </div>
-            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-1">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Approved Paid</p>
-              <h3 className="text-3xl font-black font-display text-emerald-500">৳ {stats.totalPaidBDT.toFixed(2)}</h3>
-              <p className="text-xs text-emerald-400">Cleared BDT cashout</p>
-            </div>
-            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-1">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Points Credited</p>
-              <h3 className="text-3xl font-black font-display text-blue-600">{stats.totalPointsEarned.toLocaleString()}</h3>
-              <p className="text-xs text-blue-400">Total postback leads</p>
-            </div>
-            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-1">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Pending Payouts</p>
-              <h3 className="text-3xl font-black font-display text-orange-500">{stats.pendingWithdrawalsCount}</h3>
-              <p className="text-xs text-orange-400">Requires manual review</p>
-            </div>
-          </div>
-
-          {/* Graphical Representation */}
-          <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
-            <div>
-              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                <BarChart className="w-4 h-4 text-blue-500" />
-                Registrations & Point Generation (Last 7 Days)
-              </h3>
-              <p className="text-xs text-slate-500">Dynamic ledger visualization from the platform engine.</p>
+      {/* 1. OVERVIEW TAB */}
+      {activeSubTab === 'overview' && (
+        <div className="space-y-6 animate-fadeIn" id="admin-overview">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm relative overflow-hidden group">
+              <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                <Users className="w-16 h-16" />
+              </div>
+              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Total Users</h4>
+              <p className="text-3xl font-black font-display text-slate-800">{stats?.totalUsers.toLocaleString() || 0}</p>
             </div>
             
-            {/* Elegant SVG/CSS Area Chart representing statistics */}
-            <div className="h-64 flex items-end justify-between gap-4 border-b border-l border-slate-100 pt-8 px-4 relative">
-              <div className="absolute inset-0 flex flex-col justify-between py-8 pl-4 pointer-events-none text-[10px] font-mono text-slate-300">
-                <div className="border-t border-slate-50/50 w-full text-right pr-2">100% Volume</div>
-                <div className="border-t border-slate-50/50 w-full text-right pr-2">50% Volume</div>
-                <div className="border-t border-slate-50/50 w-full text-right pr-2">Base</div>
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm relative overflow-hidden group">
+              <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                <Target className="w-16 h-16" />
               </div>
-              
-              {[
-                { label: 'Day 1', signups: 12, points: '45k', heightSignups: '30%', heightPoints: '40%' },
-                { label: 'Day 2', signups: 18, points: '80k', heightSignups: '45%', heightPoints: '55%' },
-                { label: 'Day 3', signups: 28, points: '120k', heightSignups: '65%', heightPoints: '75%' },
-                { label: 'Day 4', signups: 22, points: '95k', heightSignups: '50%', heightPoints: '60%' },
-                { label: 'Day 5', signups: 35, points: '180k', heightSignups: '80%', heightPoints: '90%' },
-                { label: 'Day 6', signups: 42, points: '210k', heightSignups: '95%', heightPoints: '100%' },
-                { label: 'Today', signups: 48, points: '240k', heightSignups: '100%', heightPoints: '98%' },
-              ].map((day, idx) => (
-                <div key={idx} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end relative z-10 group">
-                  <div className="flex gap-2.5 items-end justify-center w-full h-4/5 pb-1">
-                    {/* Signups bar */}
-                    <div 
-                      className="w-4 sm:w-6 bg-blue-500 rounded-t-md hover:bg-blue-600 transition-all cursor-pointer relative"
-                      style={{ height: day.heightSignups }}
-                    >
-                      <span className="opacity-0 group-hover:opacity-100 absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[9px] font-mono px-1.5 py-0.5 rounded shadow whitespace-nowrap z-50">
-                        {day.signups} Regs
-                      </span>
-                    </div>
-                    {/* Points bar */}
-                    <div 
-                      className="w-4 sm:w-6 bg-emerald-500 rounded-t-md hover:bg-emerald-600 transition-all cursor-pointer relative"
-                      style={{ height: day.heightPoints }}
-                    >
-                      <span className="opacity-0 group-hover:opacity-100 absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[9px] font-mono px-1.5 py-0.5 rounded shadow whitespace-nowrap z-50">
-                        {day.points} Pts
-                      </span>
-                    </div>
-                  </div>
-                  <span className="text-[10px] font-semibold text-slate-400 font-mono">{day.label}</span>
-                </div>
-              ))}
+              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">CPA Leads Received</h4>
+              <p className="text-3xl font-black font-display text-slate-800">{stats?.totalLeads.toLocaleString() || 0}</p>
             </div>
-
-            <div className="flex justify-center gap-6 text-xs font-semibold">
-              <span className="flex items-center gap-1.5 text-blue-500">
-                <span className="w-3 h-3 bg-blue-500 rounded"></span>
-                Daily Member Registrations
-              </span>
-              <span className="flex items-center gap-1.5 text-emerald-500">
-                <span className="w-3 h-3 bg-emerald-500 rounded"></span>
-                Completed Task Revenue Points
-              </span>
+            
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm relative overflow-hidden group">
+              <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                <DollarSign className="w-16 h-16 text-emerald-500" />
+              </div>
+              <h4 className="text-xs font-bold text-emerald-500 uppercase tracking-widest mb-1">Pending Payouts</h4>
+              <p className="text-3xl font-black font-display text-emerald-600">৳ {stats?.pendingWithdrawalsBdt.toFixed(2) || '0.00'}</p>
+            </div>
+            
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm relative overflow-hidden group">
+              <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                <Wallet className="w-16 h-16" />
+              </div>
+              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Total Paid (Approved)</h4>
+              <p className="text-3xl font-black font-display text-slate-800">৳ {stats?.approvedWithdrawalsBdt.toFixed(2) || '0.00'}</p>
             </div>
           </div>
         </div>
@@ -469,14 +400,14 @@ export default function AdminPanel({ adminUser }: AdminPanelProps) {
       {/* 2. WITHDRAWALS TAB */}
       {activeSubTab === 'withdrawals' && (
         <div className="space-y-4 animate-fadeIn" id="admin-withdrawals-ledger">
-          <div className="flex items-center justify-between">
-            <h3 className="text-base font-bold font-display text-slate-800">Pending & Historic Withdrawal Tickets</h3>
-            <span className="text-xs font-semibold text-slate-400">Click Approve to verify user lead logs & pay</span>
+          <div>
+            <h3 className="text-base font-bold font-display text-slate-800">Withdrawal Tickets Queue</h3>
+            <p className="text-xs text-slate-500">Approve or reject pending cashout requests from users.</p>
           </div>
-
+          
           {withdrawals.length === 0 ? (
             <div className="bg-white p-8 border border-slate-100 rounded-2xl text-center text-slate-400">
-              No withdrawals in database record.
+              No withdrawal requests logged yet.
             </div>
           ) : (
             <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
@@ -484,17 +415,17 @@ export default function AdminPanel({ adminUser }: AdminPanelProps) {
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-50 text-slate-400 text-[10px] font-bold uppercase tracking-wider border-b border-slate-100">
-                      <th className="px-6 py-4">Transaction ID</th>
+                      <th className="px-6 py-4">Ticket ID</th>
                       <th className="px-6 py-4">User Details</th>
-                      <th className="px-6 py-4">Payment Channel</th>
-                      <th className="px-6 py-4">Recipient Account</th>
-                      <th className="px-6 py-4">Requested Points</th>
-                      <th className="px-6 py-4">BDT Value</th>
+                      <th className="px-6 py-4">Method</th>
+                      <th className="px-6 py-4">Account Number</th>
+                      <th className="px-6 py-4">Points</th>
+                      <th className="px-6 py-4">Est. BDT</th>
                       <th className="px-6 py-4">Status</th>
                       <th className="px-6 py-4 text-center">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
+                  <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
                     {withdrawals.map((wd) => (
                       <tr key={wd.id} className="hover:bg-slate-50/50 transition">
                         <td className="px-6 py-4 font-mono font-bold text-xs text-slate-500">{wd.id}</td>
@@ -567,7 +498,7 @@ export default function AdminPanel({ adminUser }: AdminPanelProps) {
               />
             </div>
           </div>
-
+          
           <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
@@ -580,7 +511,7 @@ export default function AdminPanel({ adminUser }: AdminPanelProps) {
                     <th className="px-6 py-4">Referrals</th>
                     <th className="px-6 py-4">IP Address</th>
                     <th className="px-6 py-4">Status</th>
-                    <th className="px-6 py-4 text-right">Balance Edit / Ban actions</th>
+                    <th className="px-6 py-4 text-right">Balance Edit / Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
@@ -624,7 +555,6 @@ export default function AdminPanel({ adminUser }: AdminPanelProps) {
                               Set
                             </button>
                           </form>
-
                           {/* Ban Button */}
                           {u.status === 'active' ? (
                             <button
@@ -643,6 +573,13 @@ export default function AdminPanel({ adminUser }: AdminPanelProps) {
                               Unban
                             </button>
                           )}
+                          <button
+                            onClick={() => handleDeleteUser(u.username)}
+                            className="px-2 py-1 bg-slate-100 text-slate-600 font-bold text-[10px] rounded hover:bg-red-500 hover:text-white cursor-pointer transition"
+                            id={`delete-user-${u.username}`}
+                          >
+                            Delete
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -653,8 +590,8 @@ export default function AdminPanel({ adminUser }: AdminPanelProps) {
           </div>
         </div>
       )}
-
-      {/* 4. POSTBACK LEADS TAB */}
+      {/* 4. POSTBACK LEADS TAB */
+}
       {activeSubTab === 'postbacks' && (
         <div className="space-y-4 animate-fadeIn" id="admin-postback-ledger">
           <div>

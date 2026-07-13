@@ -274,7 +274,10 @@ let sysSettings = {
   minWithdrawRechargePoints: 2000, // 20 BDT
   minWithdrawBankPoints: 10000, // 100 BDT
   adsenseCode: '',
-  supportLink: 'https://t.me/mrcashbd'
+  supportLink: 'https://t.me/mrcashbd',
+  maintenanceMode: false,
+  maintenanceMessage: 'System is undergoing maintenance. Please check back shortly.',
+  broadcastMessage: '',
 };
 
 // Initialize settings asynchronously at startup
@@ -289,6 +292,9 @@ drizzleDb.select().from(systemSettings).where(eq(systemSettings.id, 'global')).l
         minWithdrawBankPoints: rows[0].minWithdrawBankPoints,
         adsenseCode: rows[0].adsenseCode,
         supportLink: rows[0].supportLink,
+        maintenanceMode: rows[0].maintenanceMode,
+        maintenanceMessage: rows[0].maintenanceMessage,
+        broadcastMessage: rows[0].broadcastMessage,
       };
     } else {
       drizzleDb.insert(systemSettings).values({
@@ -949,6 +955,37 @@ drizzleDb.select().from(systemSettings).where(eq(systemSettings.id, 'global')).l
         console.error('Error fetching dynamic CPALead offers:', fetchErr);
       }
 
+      // Fallback offers if none available
+      if (formattedOffers.length === 0) {
+        formattedOffers = [
+          {
+            campid: '1092831',
+            title: 'Bkash App Install & Transact',
+            description: 'Download the official bKash app from the Google Play Store, register a new account, and perform a micro-transaction.',
+            link: 'https://play.google.com/store/apps/details?id=com.bKash.customerapp',
+            payoutPoints: 8500,
+            payoutUSD: 0.85,
+            originalTitle: 'Bkash App Install & Transact',
+            country: 'BD',
+            device: 'Android',
+            category: 'App Installs'
+          },
+          {
+            campid: '1092832',
+            title: 'Nagad Account Verification',
+            description: 'Open a Nagad account using your national ID, complete KYC verification, and set your secure 4-digit PIN.',
+            link: 'https://play.google.com/store/apps/details?id=com.konasl.nagad',
+            payoutPoints: 7000,
+            payoutUSD: 0.70,
+            originalTitle: 'Nagad Account Verification',
+            country: 'BD',
+            device: 'Mobile',
+            category: 'Signups'
+          }
+        ];
+      }
+
+
       res.json({
         ip: clientIp,
         country: ipCheck.country,
@@ -1280,6 +1317,50 @@ drizzleDb.select().from(systemSettings).where(eq(systemSettings.id, 'global')).l
     } catch (err) {
       console.error('Withdraw action error:', err);
       res.status(500).json({ error: 'Server action error.' });
+    }
+  });
+
+  
+  // ADMIN: Get all users
+  app.get('/api/v1/admin/users/all', async (req, res) => {
+    try {
+      const allUsers = await drizzleDb.query.users.findMany({
+        orderBy: (users, { desc }) => [desc(users.createdAt)]
+      });
+      res.json(allUsers);
+    } catch (err) {
+      console.error('Fetch all users error:', err);
+      res.status(500).json({ error: 'Failed to fetch users.' });
+    }
+  });
+
+  // ADMIN: Delete user
+  app.delete('/api/v1/admin/users/:username', async (req, res) => {
+    try {
+      const { username } = req.params;
+      const usernameNormalized = username.toLowerCase().trim();
+      await drizzleDb.delete(schema.users).where(eq(schema.users.username, usernameNormalized));
+      res.json({ success: true, message: 'User deleted successfully' });
+    } catch (err) {
+      console.error('Delete user error:', err);
+      res.status(500).json({ error: 'Failed to delete user' });
+    }
+  });
+
+  // ADMIN: Send Broadcast
+  app.post('/api/v1/admin/broadcast', async (req, res) => {
+    try {
+      const { message } = req.body;
+      sysSettings.broadcastMessage = String(message || '');
+      
+      await drizzleDb.update(systemSettings)
+        .set({ broadcastMessage: sysSettings.broadcastMessage })
+        .where(eq(systemSettings.id, 'global'));
+        
+      res.json({ success: true, message: 'Broadcast updated successfully.' });
+    } catch (err) {
+      console.error('Broadcast error:', err);
+      res.status(500).json({ error: 'Failed to update broadcast.' });
     }
   });
 
