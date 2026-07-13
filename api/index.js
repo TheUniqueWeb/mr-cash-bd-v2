@@ -1200,7 +1200,7 @@ app.delete("/api/v1/admin/users/:username", async (req, res) => {
   try {
     const { username } = req.params;
     const usernameNormalized = username.toLowerCase().trim();
-    await db.delete(schema.users).where(eq(schema.users.username, usernameNormalized));
+    await db.delete(users).where(eq(users.username, usernameNormalized));
     res.json({ success: true, message: "User deleted successfully" });
   } catch (err) {
     console.error("Delete user error:", err);

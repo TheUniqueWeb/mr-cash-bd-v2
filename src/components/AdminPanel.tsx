@@ -18,7 +18,11 @@ import {
   ShieldCheck,
   RefreshCw,
   Trophy,
-  Crown
+  Crown,
+  TrendingUp,
+  Wallet,
+  Target,
+  Gift
 } from 'lucide-react';
 import { User, Withdrawal, PostbackLog, SystemStats } from '../types';
 

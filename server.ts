@@ -1339,7 +1339,7 @@ drizzleDb.select().from(systemSettings).where(eq(systemSettings.id, 'global')).l
     try {
       const { username } = req.params;
       const usernameNormalized = username.toLowerCase().trim();
-      await drizzleDb.delete(schema.users).where(eq(schema.users.username, usernameNormalized));
+      await drizzleDb.delete(users).where(eq(users.username, usernameNormalized));
       res.json({ success: true, message: 'User deleted successfully' });
     } catch (err) {
       console.error('Delete user error:', err);
