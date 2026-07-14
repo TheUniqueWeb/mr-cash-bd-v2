@@ -898,73 +898,106 @@ drizzleDb.select().from(systemSettings).where(eq(systemSettings.id, 'global')).l
         formattedOffers = cached.offers;
       } else {
         try {
-          // Fetch directly from CPALead API with a 10s timeout to keep it fast
-          const response = await fetch(`https://www.cpalead.com/api/offers?id=3354341&country=${userCountryCode}`, {
-            headers: { 'User-Agent': req.headers['user-agent'] || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
-            signal: AbortSignal.timeout(10000)
-          });
-          if (response.ok) {
-            const cpaLeadData = await response.json();
-            if (cpaLeadData && Array.isArray(cpaLeadData.offers)) {
-              const matchedOffers = cpaLeadData.offers.filter((o: any) => {
-                if (!o.countries || !Array.isArray(o.countries) || o.countries.length === 0) {
-                  return true;
-                }
-                const countriesUpper = o.countries.map((c: any) => String(c).toUpperCase().trim());
-                return countriesUpper.includes(userCountryCode);
-              });
+          // Parallel fetch of country-specific and global feeds to maximize speed and availability
+          const [countryRes, globalRes] = await Promise.all([
+            fetch(`https://www.cpalead.com/api/offers?id=3354341&country=${userCountryCode}`, {
+              headers: { 'User-Agent': req.headers['user-agent'] || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+              signal: AbortSignal.timeout(8000)
+            }).catch(() => null),
+            fetch(`https://www.cpalead.com/api/offers?id=3354341`, {
+              headers: { 'User-Agent': req.headers['user-agent'] || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+              signal: AbortSignal.timeout(8000)
+            }).catch(() => null)
+          ]);
 
-              formattedOffers = matchedOffers.map((o: any) => {
-                let payoutUSD = parseFloat(o.amount) || 0;
-                if (payoutUSD <= 0 && Array.isArray(o.events) && o.events.length > 0) {
-                  payoutUSD = o.events.reduce((sum: number, ev: any) => sum + (parseFloat(ev.amount) || 0), 0);
-                }
-                const payoutPoints = Math.round(payoutUSD * sysSettings.conversionRate);
-                
-                // Map CPALead type/device to category
-                let category = 'Signups';
-                const pType = String(o.payout_type || '').toUpperCase();
-                const deviceType = String(o.device || '').toLowerCase();
-                const titleLower = String(o.title || '').toLowerCase();
-                const descLower = String(o.description || '').toLowerCase();
-                
-                if (pType === 'CPI' || deviceType.includes('android') || deviceType.includes('ios') || deviceType.includes('mobile')) {
-                  category = 'App Installs';
-                } else if (titleLower.includes('survey') || titleLower.includes('poll') || descLower.includes('survey') || descLower.includes('poll') || descLower.includes('opinion')) {
-                  category = 'Surveys';
-                }
-
-                // Normalise device name
-                let normalizedDevice = 'Mobile';
-                if (deviceType.includes('android')) {
-                  normalizedDevice = 'Android';
-                } else if (deviceType.includes('ios') || deviceType.includes('iphone') || deviceType.includes('ipad')) {
-                  normalizedDevice = 'iOS';
-                } else if (deviceType.includes('desktop')) {
-                  normalizedDevice = 'Desktop';
-                }
-
-                return {
-                  campid: String(o.id),
-                  title: String(o.title || 'Premium Offer'),
-                  description: String(o.description || o.conversion || 'Complete this easy action to receive your points reward!'),
-                  link: String(o.link || ''),
-                  payoutPoints,
-                  payoutUSD,
-                  originalTitle: String(o.title || 'Premium Offer'),
-                  country: Array.isArray(o.countries) ? o.countries.join(', ') : 'BD',
-                  device: normalizedDevice,
-                  category
-                };
-              });
-
-              // Update in-memory cache
-              offersCacheByCountry[cacheKey] = {
-                offers: formattedOffers,
-                timestamp: now
-              };
+          let countryOffersRaw: any[] = [];
+          if (countryRes && countryRes.ok) {
+            const data = await countryRes.json().catch(() => null);
+            if (data && Array.isArray(data.offers)) {
+              countryOffersRaw = data.offers;
             }
           }
+
+          let globalOffersRaw: any[] = [];
+          if (globalRes && globalRes.ok) {
+            const data = await globalRes.json().catch(() => null);
+            if (data && Array.isArray(data.offers)) {
+              globalOffersRaw = data.offers;
+            }
+          }
+
+          // Merge country-specific offers first, then append global/all offers to fill up the list without duplicates
+          const seenCampIds = new Set<string>();
+          const mergedRawOffers: any[] = [];
+
+          for (const o of countryOffersRaw) {
+            const campIdStr = String(o.id);
+            if (!seenCampIds.has(campIdStr)) {
+              seenCampIds.add(campIdStr);
+              mergedRawOffers.push(o);
+            }
+          }
+
+          for (const o of globalOffersRaw) {
+            const campIdStr = String(o.id);
+            if (!seenCampIds.has(campIdStr)) {
+              seenCampIds.add(campIdStr);
+              mergedRawOffers.push(o);
+            }
+          }
+
+          formattedOffers = mergedRawOffers.map((o: any) => {
+            let payoutUSD = parseFloat(o.amount) || 0;
+            if (payoutUSD <= 0 && Array.isArray(o.events) && o.events.length > 0) {
+              payoutUSD = o.events.reduce((sum: number, ev: any) => sum + (parseFloat(ev.amount) || 0), 0);
+            }
+            const payoutPoints = Math.round(payoutUSD * sysSettings.conversionRate);
+            
+            // Map CPALead type/device to category
+            let category = 'Signups';
+            const pType = String(o.payout_type || '').toUpperCase();
+            const deviceType = String(o.device || '').toLowerCase();
+            const titleLower = String(o.title || '').toLowerCase();
+            const descLower = String(o.description || '').toLowerCase();
+            
+            if (pType === 'CPI' || deviceType.includes('android') || deviceType.includes('ios') || deviceType.includes('mobile')) {
+              category = 'App Installs';
+            } else if (titleLower.includes('survey') || titleLower.includes('poll') || descLower.includes('survey') || descLower.includes('poll') || descLower.includes('opinion')) {
+              category = 'Surveys';
+            }
+
+            // Normalise device name
+            let normalizedDevice = 'Mobile';
+            if (deviceType.includes('android')) {
+              normalizedDevice = 'Android';
+            } else if (deviceType.includes('ios') || deviceType.includes('iphone') || deviceType.includes('ipad')) {
+              normalizedDevice = 'iOS';
+            } else if (deviceType.includes('desktop')) {
+              normalizedDevice = 'Desktop';
+            }
+
+            return {
+              campid: String(o.id),
+              title: String(o.title || 'Premium Offer'),
+              description: String(o.description || o.conversion || 'Complete this easy action to receive your points reward!'),
+              link: String(o.link || ''),
+              payoutPoints,
+              payoutUSD,
+              originalTitle: String(o.title || 'Premium Offer'),
+              country: Array.isArray(o.countries) ? o.countries.join(', ') : 'BD',
+              device: normalizedDevice,
+              category
+            };
+          });
+
+          // Sort by payoutPoints descending so high-paying tasks are displayed first
+          formattedOffers.sort((a, b) => b.payoutPoints - a.payoutPoints);
+
+          // Update in-memory cache
+          offersCacheByCountry[cacheKey] = {
+            offers: formattedOffers,
+            timestamp: now
+          };
         } catch (fetchErr) {
           console.error('Error fetching dynamic CPALead offers:', fetchErr);
           // If CPALead API is down or slow, serve stale cache if available to guarantee high availability
