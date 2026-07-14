@@ -182,7 +182,7 @@ export default function App() {
       />
 
       {/* 2. Main Tab View Area */}
-      /<main className="flex-grow pb-16">/
+      <main className="flex-grow pb-16">
 
       {/* Broadcast Message */}
       {systemSettings?.broadcastMessage && (

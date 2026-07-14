@@ -933,16 +933,32 @@ drizzleDb.select().from(systemSettings).where(eq(systemSettings.id, 'global')).l
           for (const o of countryOffersRaw) {
             const campIdStr = String(o.id);
             if (!seenCampIds.has(campIdStr)) {
-              seenCampIds.add(campIdStr);
-              mergedRawOffers.push(o);
+              const allowedCountries = Array.isArray(o.countries)
+                ? o.countries.map((c: any) => String(c).toUpperCase().trim())
+                : [];
+              const isAvailable = allowedCountries.length === 0 || 
+                                  allowedCountries.includes('ALL') || 
+                                  allowedCountries.includes(userCountryCode);
+              if (isAvailable) {
+                seenCampIds.add(campIdStr);
+                mergedRawOffers.push(o);
+              }
             }
           }
 
           for (const o of globalOffersRaw) {
             const campIdStr = String(o.id);
             if (!seenCampIds.has(campIdStr)) {
-              seenCampIds.add(campIdStr);
-              mergedRawOffers.push(o);
+              const allowedCountries = Array.isArray(o.countries)
+                ? o.countries.map((c: any) => String(c).toUpperCase().trim())
+                : [];
+              const isAvailable = allowedCountries.length === 0 || 
+                                  allowedCountries.includes('ALL') || 
+                                  allowedCountries.includes(userCountryCode);
+              if (isAvailable) {
+                seenCampIds.add(campIdStr);
+                mergedRawOffers.push(o);
+              }
             }
           }
 
