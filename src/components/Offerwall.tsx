@@ -70,12 +70,20 @@ export default function Offerwall({ user, onOpenAuth }: OfferwallProps) {
     fetchOffers();
   }, [user]);
 
-  // Generate redirect link
+  // Generate redirect link client-side to prevent iframe proxy/cookie check redirection 404 errors
   const getRedirectLink = (offer: CPAOffer) => {
     if (!user) return '';
-    const origin = window.location.origin;
-    const maskedRedirect = `${origin}/api/v1/offers/redirect?offerId=${encodeURIComponent(offer.campid)}&userId=${encodeURIComponent(user.username)}&originalLink=${encodeURIComponent(offer.link)}`;
-    return maskedRedirect;
+    try {
+      const uid = String(user.username).toLowerCase().trim();
+      const urlObj = new URL(offer.link);
+      urlObj.searchParams.set('subid', uid);
+      urlObj.searchParams.set('aff_sub', uid);
+      urlObj.searchParams.set('click_id', `${uid}-${Date.now()}`);
+      return urlObj.toString();
+    } catch (e) {
+      console.warn('URL parsing failed client-side, falling back to original:', offer.link, e);
+      return offer.link;
+    }
   };
 
   const getDeviceIcon = (device?: string) => {
