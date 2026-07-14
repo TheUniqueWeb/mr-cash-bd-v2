@@ -73,7 +73,8 @@ export default function Offerwall({ user, onOpenAuth }: OfferwallProps) {
   // Generate redirect link
   const getRedirectLink = (offer: CPAOffer) => {
     if (!user) return '';
-    const maskedRedirect = `/api/v1/redirect?offerId=${encodeURIComponent(offer.campid)}&userId=${encodeURIComponent(user.username)}&originalLink=${encodeURIComponent(offer.link)}`;
+    const origin = window.location.origin;
+    const maskedRedirect = `${origin}/api/v1/offers/redirect?offerId=${encodeURIComponent(offer.campid)}&userId=${encodeURIComponent(user.username)}&originalLink=${encodeURIComponent(offer.link)}`;
     return maskedRedirect;
   };
 

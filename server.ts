@@ -1033,14 +1033,17 @@ drizzleDb.select().from(systemSettings).where(eq(systemSettings.id, 'global')).l
       const uid = String(username).toLowerCase().trim();
       const targetLink = decodeURIComponent(link as string);
 
-      // Append security postback subid markers
-      const urlObj = new URL(targetLink);
-      urlObj.searchParams.set('subid', uid);
-      urlObj.searchParams.set('aff_sub', uid);
-      urlObj.searchParams.set('click_id', `${uid}-${Date.now()}`);
-
-      // Redirect the user to the final CPA link securely
-      res.redirect(urlObj.toString());
+      // Append security postback subid markers securely
+      try {
+        const urlObj = new URL(targetLink);
+        urlObj.searchParams.set('subid', uid);
+        urlObj.searchParams.set('aff_sub', uid);
+        urlObj.searchParams.set('click_id', `${uid}-${Date.now()}`);
+        res.redirect(urlObj.toString());
+      } catch (urlErr) {
+        console.warn('URL parsing failed during redirect, falling back to direct redirect:', targetLink, urlErr);
+        res.redirect(targetLink);
+      }
     } catch (err) {
       console.error('Redirect error:', err);
       res.status(500).send('Failed to parse offer redirect link.');
